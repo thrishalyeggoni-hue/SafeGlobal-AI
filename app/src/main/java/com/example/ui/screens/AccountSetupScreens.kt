@@ -87,7 +87,7 @@ fun CreateIdScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color.Transparent)
             .statusBarsPadding()
             .imePadding()
             .testTag("create_id_screen_root")
@@ -307,7 +307,7 @@ fun CreatePasswordScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color.Transparent)
             .statusBarsPadding()
             .imePadding()
             .testTag("create_password_screen_root")
@@ -467,7 +467,7 @@ fun CompleteProfileScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color.Transparent)
             .statusBarsPadding()
             .imePadding()
             .testTag("complete_profile_screen_root")

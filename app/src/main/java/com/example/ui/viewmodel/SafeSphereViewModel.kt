@@ -57,7 +57,15 @@ enum class ScreenDestination {
     DEMO_SIMULATOR,
     SAFE_ZONES,
     FAMILY_MEMBERS,
-    PROFILE
+    PROFILE,
+    // Real Multi-Device Two-Phone Screens
+    LINK_CODE_GENERATOR,
+    ENTER_LINK_CODE,
+    STUDENT_CONTROL_CENTER,
+    SAFE_ZONE_CREATOR,
+    CAMERA_REQUEST,
+    CAMERA_SHARE,
+    CAMERA_VIEW
 }
 
 class SafeSphereViewModel(application: Application) : AndroidViewModel(application) {
@@ -106,6 +114,56 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     // Theme color accent
     private val _themeAccent = MutableStateFlow(AccentBlue)
     val themeAccent: StateFlow<Color> = _themeAccent.asStateFlow()
+
+    // ── Dynamic Topographic Watermark States ───────────────────────
+    private val _watermarkMode = MutableStateFlow(com.example.ui.components.WatermarkMode.NORMAL)
+    val watermarkMode: StateFlow<com.example.ui.components.WatermarkMode> = _watermarkMode.asStateFlow()
+
+    private val _gpsRippleTimestamp = MutableStateFlow(0L)
+    val gpsRippleTimestamp: StateFlow<Long> = _gpsRippleTimestamp.asStateFlow()
+
+    private val _geofenceAlertTimestamp = MutableStateFlow(0L)
+    val geofenceAlertTimestamp: StateFlow<Long> = _geofenceAlertTimestamp.asStateFlow()
+
+    private val _watermarkStatusOverride = MutableStateFlow<String?>(null)
+    val watermarkStatusOverride: StateFlow<String?> = _watermarkStatusOverride.asStateFlow()
+
+    // ── Real Multi-Device Two-Phone Safety States ──────────────────
+    private val _linkedStudents = MutableStateFlow<List<com.example.data.repository.FirestoreSafetyManager.FamilyLink>>(emptyList())
+    val linkedStudents: StateFlow<List<com.example.data.repository.FirestoreSafetyManager.FamilyLink>> = _linkedStudents.asStateFlow()
+
+    private val _linkedParents = MutableStateFlow<List<com.example.data.repository.FirestoreSafetyManager.FamilyLink>>(emptyList())
+    val linkedParents: StateFlow<List<com.example.data.repository.FirestoreSafetyManager.FamilyLink>> = _linkedParents.asStateFlow()
+
+    private val _selectedStudent = MutableStateFlow<com.example.data.repository.FirestoreSafetyManager.FamilyLink?>(null)
+    val selectedStudent: StateFlow<com.example.data.repository.FirestoreSafetyManager.FamilyLink?> = _selectedStudent.asStateFlow()
+
+    private val _selectedStudentLocation = MutableStateFlow<com.example.data.repository.FirestoreSafetyManager.LiveLocation?>(null)
+    val selectedStudentLocation: StateFlow<com.example.data.repository.FirestoreSafetyManager.LiveLocation?> = _selectedStudentLocation.asStateFlow()
+
+    private val _selectedStudentSafeZones = MutableStateFlow<List<com.example.data.repository.FirestoreSafetyManager.FirestoreSafeZone>>(emptyList())
+    val selectedStudentSafeZones: StateFlow<List<com.example.data.repository.FirestoreSafetyManager.FirestoreSafeZone>> = _selectedStudentSafeZones.asStateFlow()
+
+    private val _selectedStudentGeofenceEvents = MutableStateFlow<List<com.example.data.repository.FirestoreSafetyManager.FirestoreGeofenceEvent>>(emptyList())
+    val selectedStudentGeofenceEvents: StateFlow<List<com.example.data.repository.FirestoreSafetyManager.FirestoreGeofenceEvent>> = _selectedStudentGeofenceEvents.asStateFlow()
+
+    // Camera Request Signaling
+    private val _activeCameraRequest = MutableStateFlow<com.example.data.repository.FirestoreSafetyManager.CameraRequest?>(null)
+    val activeCameraRequest: StateFlow<com.example.data.repository.FirestoreSafetyManager.CameraRequest?> = _activeCameraRequest.asStateFlow()
+
+    private val _incomingCameraRequestForStudent = MutableStateFlow<com.example.data.repository.FirestoreSafetyManager.CameraRequest?>(null)
+    val incomingCameraRequestForStudent: StateFlow<com.example.data.repository.FirestoreSafetyManager.CameraRequest?> = _incomingCameraRequestForStudent.asStateFlow()
+
+    // 6-digit Code Linking States
+    private val _generatedLinkInvite = MutableStateFlow<com.example.data.repository.FirestoreSafetyManager.LinkInvite?>(null)
+    val generatedLinkInvite: StateFlow<com.example.data.repository.FirestoreSafetyManager.LinkInvite?> = _generatedLinkInvite.asStateFlow()
+
+    var linkCodeInput = MutableStateFlow("")
+    var linkErrorMessage = MutableStateFlow<String?>(null)
+    private val _linkSuccessMessage = MutableStateFlow<String?>(null)
+    val linkSuccessMessage: StateFlow<String?> = _linkSuccessMessage.asStateFlow()
+
+    val isLocationTrackingActive = com.example.service.LocationTrackingService.isTrackingActive
 
     // --- Form states — ALL EMPTY by default, no fake data ---
     var phoneInput = MutableStateFlow("")
@@ -232,7 +290,8 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
             _isDataLoading.value = true
             _loadingStatus.value = "Fetching your profile..."
 
-            val uid = FirebaseAuthManager.currentUser?.uid ?: ("user_" + java.util.UUID.randomUUID().toString().take(8))
+            val enteredPhone = "${countryCode.value.trim()}${phoneInput.value.trim()}"
+            val uid = FirebaseAuthManager.getEffectiveUid(enteredPhone)
 
             val profile = FirestoreUserManager.getUserProfile(uid)
             _isDataLoading.value = false
@@ -242,6 +301,7 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
                 _firestoreProfile.value = profile
                 _activeDashboardRole.value = profile.toUserRole()
                 _loadingStatus.value = "Welcome back, ${profile.displayName}!"
+                initSafetyListenersForUser(profile.uid, profile.toUserRole())
                 if (profile.toUserRole() == UserRole.PARENT) {
                     _currentScreen.value = ScreenDestination.PARENT_DASHBOARD
                 } else {
@@ -282,11 +342,11 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
             _loadingStatus.value = "Creating your account..."
 
             val user = FirebaseAuthManager.currentUser
-            val uid = user?.uid ?: ("user_" + java.util.UUID.randomUUID().toString().take(8))
+            val entered = phoneInput.value.trim()
             val phone = user?.phoneNumber ?: run {
-                val entered = phoneInput.value.trim()
                 if (entered.isNotEmpty()) "${countryCode.value.trim()}$entered" else "+919876543210"
             }
+            val uid = FirebaseAuthManager.getEffectiveUid(phone)
 
             val name = fullNameInput.value.trim()
             val id = safeSphereIdInput.value.trim()
@@ -312,27 +372,34 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
             )
             repository.saveUser(safeUser)
 
+            val initialProfile = FirestoreUserManager.UserProfile(
+                uid = uid,
+                phone = phone,
+                displayName = name,
+                role = role.name,
+                gradeClass = grade,
+                safeSphereId = id,
+                familyId = FirestoreUserManager.generateFamilyId(),
+                isProfileComplete = true,
+                createdAt = System.currentTimeMillis()
+            )
+            _firestoreProfile.value = initialProfile
+
             // Asynchronously sync to Firestore in background without blocking UI navigation
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    withTimeoutOrNull(2000L) {
-                        FirestoreUserManager.createInitialProfile(
-                            uid = uid,
-                            phone = phone,
-                            role = role,
-                            displayName = name,
-                            safeSphereId = id,
-                            gradeClass = grade
-                        )
+                    withTimeoutOrNull(4000L) {
+                        FirestoreUserManager.saveUserProfile(initialProfile)
                     }
                 } catch (e: Exception) {
-                    // Suppressed in local/offline environment
+                    // Handled by memoryProfileCache fallback
                 }
             }
 
             _isDataLoading.value = false
             _activeDashboardRole.value = role
             _loadingStatus.value = "Account created! Welcome, $name 🎉"
+            initSafetyListenersForUser(uid, role)
             onSuccess()
         }
     }
@@ -340,18 +407,33 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     fun navigateTo(destination: ScreenDestination) {
         val currentRole = _activeDashboardRole.value
 
-        // Strict Role Separation: Students cannot access Parent Dashboard or Parental Approval
+        // Strict Role Separation: Students cannot access Parent Dashboard, Parental Approval, Safe Zones, Member Management, or Parent Link Screens
         if (currentRole == UserRole.STUDENT) {
-            if (destination == ScreenDestination.PARENT_DASHBOARD || destination == ScreenDestination.PARENT_APPROVAL) {
-                _accessDeniedMessage.value = "🔒 Access Denied: Students are strictly restricted from accessing the Parent Dashboard and Parental Approval controls."
+            if (destination in listOf(
+                ScreenDestination.PARENT_DASHBOARD,
+                ScreenDestination.PARENT_APPROVAL,
+                ScreenDestination.SAFE_ZONES,
+                ScreenDestination.FAMILY_MEMBERS,
+                ScreenDestination.ENTER_LINK_CODE,
+                ScreenDestination.STUDENT_CONTROL_CENTER,
+                ScreenDestination.SAFE_ZONE_CREATOR,
+                ScreenDestination.CAMERA_REQUEST,
+                ScreenDestination.CAMERA_VIEW
+            )) {
+                _accessDeniedMessage.value = "🔒 Access Denied: Students are restricted from accessing Parent-only administrative and safety controls."
                 return
             }
         }
 
-        // Strict Role Separation: Parents cannot access Student Dashboard directly
+        // Strict Role Separation: Parents cannot access Student-only features (e.g. Request Journey, Student Dashboard, Link Generator, Camera Share)
         if (currentRole == UserRole.PARENT) {
-            if (destination == ScreenDestination.STUDENT_DASHBOARD) {
-                _accessDeniedMessage.value = "🔒 Access Denied: Parents monitor family journeys through the Parent Dashboard and Family Map. Student Dashboard is restricted."
+            if (destination in listOf(
+                ScreenDestination.STUDENT_DASHBOARD,
+                ScreenDestination.REQUEST_JOURNEY,
+                ScreenDestination.LINK_CODE_GENERATOR,
+                ScreenDestination.CAMERA_SHARE
+            )) {
+                _accessDeniedMessage.value = "🔒 Access Denied: This feature is exclusively for Students. Parents monitor journeys through the Parent Dashboard and Family Map."
                 return
             }
         }
@@ -618,6 +700,271 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     fun removeSafeZone(id: Long) {
         viewModelScope.launch {
             repository.removeSafeZone(id)
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // MULTI-DEVICE TWO-PHONE SAFETY LOGIC (Phases 1-10)
+    // ══════════════════════════════════════════════════════════════════
+
+    fun initSafetyListenersForUser(uid: String, role: UserRole) {
+        if (role == UserRole.PARENT) {
+            viewModelScope.launch {
+                com.example.data.repository.FirestoreSafetyManager.observeLinkedStudentsForParent(uid)
+                    .collect { links ->
+                        _linkedStudents.value = links
+                        if (_selectedStudent.value == null && links.isNotEmpty()) {
+                            selectStudent(links.first())
+                        }
+                    }
+            }
+        } else {
+            viewModelScope.launch {
+                com.example.data.repository.FirestoreSafetyManager.observeLinkedParentsForStudent(uid)
+                    .collect { links ->
+                        _linkedParents.value = links
+                    }
+            }
+            viewModelScope.launch {
+                com.example.data.repository.FirestoreSafetyManager.observeIncomingCameraRequestsForStudent(uid)
+                    .collect { requests ->
+                        _incomingCameraRequestForStudent.value = requests.firstOrNull()
+                    }
+            }
+        }
+    }
+
+    // ── Phase 2: Family Linking ───────────────────────────────────────
+    fun generateStudentLinkCode() {
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Generating Link Code..."
+            val codeNum = (100000..999999).random()
+            val code = "SF-$codeNum"
+
+            val profile = _firestoreProfile.value
+            val phone = profile?.phone.orEmpty().ifBlank { "${countryCode.value}${phoneInput.value}" }
+            val uid = profile?.uid ?: FirebaseAuthManager.getEffectiveUid(phone)
+            val name = profile?.displayName.orEmpty().ifBlank { fullNameInput.value.ifBlank { "Student" } }
+            val safeSphereId = profile?.safeSphereId.orEmpty().ifBlank { safeSphereIdInput.value }
+
+            val invite = com.example.data.repository.FirestoreSafetyManager.LinkInvite(
+                code = code,
+                studentUid = uid,
+                studentName = name,
+                studentPhone = phone,
+                studentSafeSphereId = safeSphereId,
+                status = "PENDING",
+                createdAt = System.currentTimeMillis(),
+                expiresAt = System.currentTimeMillis() + 10 * 60 * 1000L
+            )
+
+            val res = com.example.data.repository.FirestoreSafetyManager.createLinkInvite(invite)
+            _isDataLoading.value = false
+            if (res.isSuccess) {
+                _generatedLinkInvite.value = invite
+                _loadingStatus.value = "Code Ready"
+
+                // Observe invite status in realtime
+                launch {
+                    com.example.data.repository.FirestoreSafetyManager.observeLinkInvite(code).collect { updated ->
+                        if (updated != null) {
+                            _generatedLinkInvite.value = updated
+                            if (updated.status == "ACCEPTED") {
+                                _linkSuccessMessage.value = "Parent successfully linked! Safeguard active."
+                                delay(2000)
+                                _currentScreen.value = ScreenDestination.STUDENT_DASHBOARD
+                            }
+                        }
+                    }
+                }
+            } else {
+                _loadingStatus.value = "Failed to generate code"
+            }
+        }
+    }
+
+    fun submitParentLinkCode(onSuccess: () -> Unit) {
+        val code = linkCodeInput.value.trim().uppercase()
+        if (code.isBlank() || code.length < 6) {
+            linkErrorMessage.value = "Please enter a valid 6-digit code (e.g. SF-123456 or 123456)"
+            return
+        }
+        val formattedCode = if (code.startsWith("SF-")) code else "SF-$code"
+
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Verifying Student Code..."
+            linkErrorMessage.value = null
+
+            val profile = _firestoreProfile.value
+            val parentPhone = profile?.phone.orEmpty().ifBlank { "${countryCode.value}${phoneInput.value}" }
+            val parentUid = profile?.uid ?: FirebaseAuthManager.getEffectiveUid(parentPhone)
+            val parentName = profile?.displayName.orEmpty().ifBlank { "Parent" }
+
+            val result = com.example.data.repository.FirestoreSafetyManager.acceptLinkInvite(
+                code = formattedCode,
+                parentUid = parentUid,
+                parentName = parentName,
+                parentPhone = parentPhone
+            )
+
+            _isDataLoading.value = false
+            if (result.isSuccess) {
+                val link = result.getOrNull()
+                linkCodeInput.value = ""
+                _linkSuccessMessage.value = "Successfully linked to ${link?.studentName ?: "Student"}!"
+                if (link != null) {
+                    selectStudent(link)
+                }
+                onSuccess()
+            } else {
+                linkErrorMessage.value = result.exceptionOrNull()?.message ?: "Failed to link. Please try again."
+            }
+        }
+    }
+
+    // ── Phase 3 & 4: Live Location & Student Selection ─────────────────
+    fun selectStudent(link: com.example.data.repository.FirestoreSafetyManager.FamilyLink) {
+        _selectedStudent.value = link
+
+        // Real-time student location
+        viewModelScope.launch {
+            com.example.data.repository.FirestoreSafetyManager.observeStudentLocation(link.studentUid)
+                .collect { loc ->
+                    _selectedStudentLocation.value = loc
+                    if (loc != null) {
+                        _gpsRippleTimestamp.value = System.currentTimeMillis()
+                    }
+                }
+        }
+
+        // Real-time student safe zones
+        viewModelScope.launch {
+            com.example.data.repository.FirestoreSafetyManager.observeSafeZonesForStudent(link.studentUid)
+                .collect { zones ->
+                    _selectedStudentSafeZones.value = zones
+                }
+        }
+
+        // Real-time geofence events
+        viewModelScope.launch {
+            com.example.data.repository.FirestoreSafetyManager.observeGeofenceEventsForStudent(link.studentUid)
+                .collect { events ->
+                    _selectedStudentGeofenceEvents.value = events
+                    val latest = events.firstOrNull()
+                    if (latest != null && latest.eventType == "EXIT" && (System.currentTimeMillis() - latest.timestamp) < 30000L) {
+                        _geofenceAlertTimestamp.value = latest.timestamp
+                        _watermarkMode.value = com.example.ui.components.WatermarkMode.GEOFENCE_ALERT
+                    }
+                }
+        }
+    }
+
+    fun toggleStudentLocationTracking(context: android.content.Context) {
+        val isRunning = com.example.service.LocationTrackingService.isTrackingActive.value
+        if (isRunning) {
+            com.example.service.LocationTrackingService.stopService(context)
+            _watermarkMode.value = com.example.ui.components.WatermarkMode.NORMAL
+        } else {
+            val profile = _firestoreProfile.value
+            val uid = profile?.uid ?: FirebaseAuthManager.currentUser?.uid ?: return
+            val name = profile?.displayName.orEmpty().ifBlank { "Student" }
+            com.example.service.LocationTrackingService.startService(context, uid, name)
+            _watermarkMode.value = com.example.ui.components.WatermarkMode.TRACKING
+        }
+    }
+
+    // ── Phase 5: Safe Zones (Firestore-backed) ─────────────────────────
+    fun createFirestoreSafeZone(name: String, lat: Double, lng: Double, radius: Double) {
+        val student = _selectedStudent.value
+        val parentUid = _firestoreProfile.value?.uid ?: FirebaseAuthManager.currentUser?.uid ?: ""
+        val studentUid = student?.studentUid ?: ""
+
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Saving Safe Zone..."
+            val zone = com.example.data.repository.FirestoreSafetyManager.FirestoreSafeZone(
+                zoneId = "zone_${System.currentTimeMillis()}",
+                parentUid = parentUid,
+                studentUid = studentUid,
+                name = name,
+                latitude = lat,
+                longitude = lng,
+                radiusMeters = radius,
+                alertOnExit = true,
+                alertOnEntry = true,
+                createdAt = System.currentTimeMillis()
+            )
+            com.example.data.repository.FirestoreSafetyManager.saveSafeZone(zone)
+            _isDataLoading.value = false
+            _loadingStatus.value = "Safe Zone Active ✓"
+            delay(1500)
+            _loadingStatus.value = "All Protections Armed"
+        }
+    }
+
+    fun deleteFirestoreSafeZone(zoneId: String) {
+        viewModelScope.launch {
+            com.example.data.repository.FirestoreSafetyManager.deleteSafeZone(zoneId)
+        }
+    }
+
+    // ── Phase 8 & 9: Camera Request & Consensual Sharing ───────────────
+    fun requestLiveCamera() {
+        val student = _selectedStudent.value ?: return
+        val profile = _firestoreProfile.value
+        val parentUid = profile?.uid ?: FirebaseAuthManager.currentUser?.uid ?: ""
+        val parentName = profile?.displayName.orEmpty().ifBlank { "Parent" }
+
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Sending Camera Request..."
+            val res = com.example.data.repository.FirestoreSafetyManager.requestCamera(
+                parentUid = parentUid,
+                parentName = parentName,
+                studentUid = student.studentUid,
+                studentName = student.studentName
+            )
+            _isDataLoading.value = false
+            if (res.isSuccess) {
+                val reqId = res.getOrThrow()
+                _currentScreen.value = ScreenDestination.CAMERA_VIEW
+
+                // Observe camera request state
+                launch {
+                    com.example.data.repository.FirestoreSafetyManager.observeCameraRequest(reqId).collect { req ->
+                        _activeCameraRequest.value = req
+                    }
+                }
+            } else {
+                _loadingStatus.value = "Request Failed"
+            }
+        }
+    }
+
+    fun respondToCameraRequest(requestId: String, accept: Boolean) {
+        viewModelScope.launch {
+            val status = if (accept) "STREAMING" else "DECLINED"
+            com.example.data.repository.FirestoreSafetyManager.updateCameraRequestStatus(requestId, status)
+            if (accept) {
+                _currentScreen.value = ScreenDestination.CAMERA_SHARE
+            } else {
+                _incomingCameraRequestForStudent.value = null
+            }
+        }
+    }
+
+    fun endCameraSession(requestId: String) {
+        viewModelScope.launch {
+            com.example.data.repository.FirestoreSafetyManager.updateCameraRequestStatus(requestId, "ENDED")
+            _activeCameraRequest.value = null
+            _incomingCameraRequestForStudent.value = null
+            if (_activeDashboardRole.value == UserRole.PARENT) {
+                _currentScreen.value = ScreenDestination.STUDENT_CONTROL_CENTER
+            } else {
+                _currentScreen.value = ScreenDestination.STUDENT_DASHBOARD
+            }
         }
     }
 }

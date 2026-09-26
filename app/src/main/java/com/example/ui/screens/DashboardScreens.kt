@@ -41,12 +41,22 @@ import androidx.compose.material.icons.filled.SupervisorAccount
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -79,7 +89,7 @@ const val MAP_PREVIEW_URL = "https://lh3.googleusercontent.com/aida-public/AB6AX
 @Composable
 fun RoleSecurityBanner(
     activeRole: UserRole,
-    onSwitchAccountRequest: () -> Unit,
+    onSwitchAccountRequest: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isParent = activeRole == UserRole.PARENT
@@ -151,16 +161,18 @@ fun RoleSecurityBanner(
                 }
             }
 
+            // Role badge only — NO switch button (strict role isolation)
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
-                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                    .clickable { onSwitchAccountRequest() }
+                    .background(if (isParent) Color(0xFFEFF6FF) else Color(0xFFF0FDF4))
+                    .border(1.dp,
+                        if (isParent) Color(0xFF3B82F6) else Color(0xFF10B981),
+                        RoundedCornerShape(12.dp))
                     .padding(horizontal = 9.dp, vertical = 6.dp)
             ) {
                 Text(
-                    text = if (isParent) "Switch to Student" else "Switch to Parent",
+                    text = if (isParent) "🛡 Parent" else "🎒 Student",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (isParent) Color(0xFF1652F0) else Color(0xFF006B49)
@@ -180,7 +192,7 @@ fun ParentDashboardScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -193,10 +205,9 @@ fun ParentDashboardScreen(
             onSyncClick = { viewModel.triggerDataSync() }
         )
 
-        // Role Isolation Security Banner (strictly segregated)
+        // Role Isolation Security Banner (strictly segregated — no switch)
         RoleSecurityBanner(
-            activeRole = UserRole.PARENT,
-            onSwitchAccountRequest = { viewModel.switchAuthenticatedAccount(UserRole.STUDENT) }
+            activeRole = UserRole.PARENT
         )
 
         // Header Greeting with Avatar & Notif
@@ -272,6 +283,154 @@ fun ParentDashboardScreen(
                             .clip(CircleShape)
                             .background(Color(0xFFBA1A1A))
                     )
+                }
+            }
+        }
+
+        val linkedStudents by viewModel.linkedStudents.collectAsState()
+
+        // Real Connected Students Section (Two-Phone Family Safety)
+        if (linkedStudents.isEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.navigateTo(ScreenDestination.ENTER_LINK_CODE) },
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF3B82F6)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEFF6FF)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(imageVector = Icons.Default.Link, contentDescription = null, tint = Color(0xFF2563EB))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Connect Student Device", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                        Text(text = "Enter student's 6-digit code to enable real-time Leaflet tracking, safe zones & camera check.", fontSize = 11.5.sp, color = Color(0xFF64748B))
+                    }
+                    Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF2563EB))
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "LINKED STUDENTS (${linkedStudents.size})",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "+ Link Another",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2563EB),
+                        modifier = Modifier.clickable { viewModel.navigateTo(ScreenDestination.ENTER_LINK_CODE) }
+                    )
+                }
+
+                linkedStudents.forEach { student ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.selectStudent(student)
+                                viewModel.navigateTo(ScreenDestination.STUDENT_CONTROL_CENTER)
+                            },
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF3B82F6).copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = student.studentName.take(1).uppercase(), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF1D4ED8))
+                                    }
+                                    Column {
+                                        Text(text = student.studentName, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1E293B))
+                                        Text(text = "ID: ${student.studentSafeSphereId.ifBlank { "Verified" }}", fontSize = 11.5.sp, color = Color(0xFF64748B))
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFDCFCE7))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(text = "🟢 Active", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF16A34A))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        viewModel.selectStudent(student)
+                                        viewModel.navigateTo(ScreenDestination.FAMILY_MAP)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEFF6FF)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Map, contentDescription = null, tint = Color(0xFF2563EB), modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Map", color = Color(0xFF2563EB), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        viewModel.selectStudent(student)
+                                        viewModel.navigateTo(ScreenDestination.STUDENT_CONTROL_CENTER)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF1F5F9)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.HealthAndSafety, contentDescription = null, tint = Color(0xFF334155), modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Controls", color = Color(0xFF334155), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -572,7 +731,7 @@ fun ParentDashboardScreen(
             }
         }
 
-        // Quick Actions Grid (4 round buttons)
+        // Quick Actions Grid — Parent-only features
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -595,22 +754,25 @@ fun ParentDashboardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // Parent-only: Family Map (track members)
                     QuickActionItem(
-                        title = "Request\nJourney",
-                        icon = Icons.Default.DirectionsCar,
+                        title = "Track\nFamily",
+                        icon = Icons.Default.ShareLocation,
                         bgColor = Color(0xFFCCE5FF),
                         iconTint = Color(0xFF006398),
-                        onClick = { viewModel.navigateTo(ScreenDestination.REQUEST_JOURNEY) }
+                        onClick = { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) }
                     )
 
+                    // Parent-only: Safe Zones management
                     QuickActionItem(
-                        title = "Set Safe\nZone",
+                        title = "Safe\nZones",
                         icon = Icons.Default.PinDrop,
                         bgColor = Color(0xFFE4DFFF),
                         iconTint = Color(0xFF42349F),
                         onClick = { viewModel.navigateTo(ScreenDestination.SAFE_ZONES) }
                     )
 
+                    // Parent-only: Emergency SOS
                     QuickActionItem(
                         title = "Emergency\nSOS",
                         icon = Icons.Default.Warning,
@@ -619,6 +781,7 @@ fun ParentDashboardScreen(
                         onClick = { viewModel.navigateTo(ScreenDestination.EMERGENCY) }
                     )
 
+                    // Parent-only: Settings
                     QuickActionItem(
                         title = "Settings\n ",
                         icon = Icons.Default.Settings,
@@ -811,7 +974,7 @@ fun StudentDashboardScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -824,10 +987,9 @@ fun StudentDashboardScreen(
             onSyncClick = { viewModel.triggerDataSync() }
         )
 
-        // Role Isolation Security Banner (strictly segregated)
+        // Role Isolation Security Banner (strictly segregated — no switch)
         RoleSecurityBanner(
-            activeRole = UserRole.STUDENT,
-            onSwitchAccountRequest = { viewModel.switchAuthenticatedAccount(UserRole.PARENT) }
+            activeRole = UserRole.STUDENT
         )
 
         // Header Greeting with Avatar
@@ -899,6 +1061,173 @@ fun StudentDashboardScreen(
                         )
                     }
                 }
+            }
+        }
+
+        val context = LocalContext.current
+        val isTrackingActive by viewModel.isLocationTrackingActive.collectAsState()
+        val incomingCameraReq by viewModel.incomingCameraRequestForStudent.collectAsState()
+        val linkedParents by viewModel.linkedParents.collectAsState()
+
+        // 1. URGENT: Incoming Camera Check Request Dialog/Card
+        if (incomingCameraReq != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFEF4444)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFDC2626)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.Videocam, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                        Column {
+                            Text(text = "Camera Check Request", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF991B1B))
+                            Text(text = "${incomingCameraReq!!.parentName} is requesting a surroundings check", fontSize = 12.sp, color = Color(0xFF7F1D1D))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.respondToCameraRequest(incomingCameraReq!!.requestId, false) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFEE2E2)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Decline", color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = { viewModel.respondToCameraRequest(incomingCameraReq!!.requestId, true) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Accept & Stream", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. REAL STUDENT LOCATION TRACKING TOGGLE
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(if (isTrackingActive) Color(0xFFDCFCE7) else Color(0xFFF1F5F9)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = if (isTrackingActive) Color(0xFF16A34A) else Color(0xFF64748B)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (isTrackingActive) "Live GPS Transmitting" else "Live Location Standby",
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (isTrackingActive) "Real-time updates sent to parents" else "Tap toggle to broadcast GPS to parents",
+                            fontSize = 11.5.sp,
+                            color = Color(0xFF64748B)
+                        )
+                    }
+                }
+
+                Switch(
+                    checked = isTrackingActive,
+                    onCheckedChange = { viewModel.toggleStudentLocationTracking(context) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color(0xFF16A34A)
+                    )
+                )
+            }
+        }
+
+        // 3. LINK WITH PARENT BUTTON
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { viewModel.navigateTo(ScreenDestination.LINK_CODE_GENERATOR) },
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFEEF2FF)),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF6366F1))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF6366F1)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(imageVector = Icons.Default.Link, contentDescription = null, tint = Color.White)
+                    }
+                    Column {
+                        Text(
+                            text = if (linkedParents.isNotEmpty()) "Linked to Guardian ✓" else "Link Parent Phone",
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E1B4B)
+                        )
+                        Text(
+                            text = if (linkedParents.isNotEmpty()) "Connected to ${linkedParents.first().parentName}" else "Generate 6-digit code for your parent",
+                            fontSize = 11.5.sp,
+                            color = Color(0xFF4338CA)
+                        )
+                    }
+                }
+                Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF6366F1))
             }
         }
 
@@ -1038,7 +1367,7 @@ fun StudentDashboardScreen(
             }
         }
 
-        // Student Quick Controls (4 round buttons)
+        // Student Quick Controls — student-only features
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -1061,6 +1390,7 @@ fun StudentDashboardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // Student-only: My Journey (share/track own journey)
                     QuickActionItem(
                         title = "My\nJourney",
                         icon = Icons.Default.Explore,
@@ -1069,14 +1399,16 @@ fun StudentDashboardScreen(
                         onClick = { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) }
                     )
 
+                    // Student-only: Request Journey approval from parent
                     QuickActionItem(
-                        title = "Safe\nZones",
-                        icon = Icons.Default.LocationOn,
+                        title = "Request\nJourney",
+                        icon = Icons.Default.DirectionsCar,
                         bgColor = Color(0xFF5A4EB8),
                         iconTint = Color.White,
-                        onClick = { viewModel.navigateTo(ScreenDestination.SAFE_ZONES) }
+                        onClick = { viewModel.navigateTo(ScreenDestination.REQUEST_JOURNEY) }
                     )
 
+                    // Both: Emergency SOS
                     QuickActionItem(
                         title = "Emergency\nSOS",
                         icon = Icons.Default.Warning,
@@ -1085,6 +1417,7 @@ fun StudentDashboardScreen(
                         onClick = { viewModel.navigateTo(ScreenDestination.EMERGENCY) }
                     )
 
+                    // Both: Settings
                     QuickActionItem(
                         title = "Settings\n ",
                         icon = Icons.Default.Settings,

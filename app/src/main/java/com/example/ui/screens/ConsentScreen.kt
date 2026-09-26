@@ -73,7 +73,7 @@ fun ConsentScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color(0xEEFFFFFF))  // semi-transparent for watermark
             .statusBarsPadding()
             .testTag("consent_screen_root")
     ) {

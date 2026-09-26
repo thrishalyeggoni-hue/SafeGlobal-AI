@@ -100,7 +100,7 @@ fun RequestJourneyScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -303,7 +303,7 @@ fun ParentApprovalScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -467,7 +467,7 @@ fun SafetyTimelineScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -482,7 +482,13 @@ fun SafetyTimelineScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                IconButton(onClick = { viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD) }) {
+                IconButton(onClick = {
+                    if (viewModel.activeDashboardRole.value == com.example.data.model.UserRole.PARENT) {
+                        viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+                    } else {
+                        viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+                    }
+                }) {
                     Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFF121C2A))
                 }
                 Text(text = "Safety Timeline", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
@@ -583,7 +589,7 @@ fun EmergencyScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -594,7 +600,13 @@ fun EmergencyScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD) }) {
+            IconButton(onClick = {
+                if (viewModel.activeDashboardRole.value == com.example.data.model.UserRole.PARENT) {
+                    viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+                } else {
+                    viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+                }
+            }) {
                 Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFF121C2A))
             }
             Text(text = "Emergency", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))

@@ -44,14 +44,18 @@ import com.example.data.model.UserRole
 import com.example.ui.components.SafeSphereBottomNavigation
 import com.example.ui.components.WithSafeSphereWatermark
 import com.example.ui.components.TopCenterBrandedLoadingIndicator
+import com.example.ui.screens.CameraShareScreen
+import com.example.ui.screens.CameraViewScreen
 import com.example.ui.screens.CompleteProfileScreen
 import com.example.ui.screens.ConsentScreen
 import com.example.ui.screens.CreateIdScreen
 import com.example.ui.screens.CreatePasswordScreen
 import com.example.ui.screens.DemoSimulatorScreen
 import com.example.ui.screens.EmergencyScreen
+import com.example.ui.screens.EnterLinkCodeScreen
 import com.example.ui.screens.FamilyMapScreen
 import com.example.ui.screens.FamilyMembersScreen
+import com.example.ui.screens.LinkCodeGeneratorScreen
 import com.example.ui.screens.LoadingScreen
 import com.example.ui.screens.OtpVerificationScreen
 import com.example.ui.screens.ParentApprovalScreen
@@ -60,10 +64,12 @@ import com.example.ui.screens.PhoneVerificationScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.RequestJourneyScreen
 import com.example.ui.screens.RoleSelectionScreen
+import com.example.ui.screens.SafeZoneCreatorScreen
 import com.example.ui.screens.SafeZonesScreen
 import com.example.ui.screens.SafetyTimelineScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SplashScreen
+import com.example.ui.screens.StudentControlCenterScreen
 import com.example.ui.screens.StudentDashboardScreen
 import com.example.ui.theme.SafeSphereTheme
 import com.example.ui.viewmodel.SafeSphereViewModel
@@ -96,18 +102,24 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
     BackHandler(
         enabled = currentScreen != ScreenDestination.PARENT_DASHBOARD &&
             currentScreen != ScreenDestination.STUDENT_DASHBOARD &&
-            currentScreen != ScreenDestination.CHOOSE_ROLE &&
+            currentScreen != ScreenDestination.PHONE_VERIFY &&
             currentScreen != ScreenDestination.SPLASH
     ) {
         when (currentScreen) {
-            ScreenDestination.LOADING -> viewModel.navigateTo(ScreenDestination.SPLASH)
-            ScreenDestination.CONSENT -> viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE)
-            ScreenDestination.PHONE_VERIFY -> viewModel.navigateTo(ScreenDestination.CONSENT)
+            ScreenDestination.LOADING -> viewModel.navigateTo(ScreenDestination.PHONE_VERIFY)
+            ScreenDestination.CONSENT -> viewModel.navigateTo(ScreenDestination.PHONE_VERIFY)
             ScreenDestination.OTP_VERIFY -> viewModel.navigateTo(ScreenDestination.PHONE_VERIFY)
-            ScreenDestination.CHOOSE_ROLE -> viewModel.navigateTo(ScreenDestination.SPLASH)
+            ScreenDestination.CHOOSE_ROLE -> viewModel.navigateTo(ScreenDestination.OTP_VERIFY)
             ScreenDestination.CREATE_ID -> viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE)
             ScreenDestination.CREATE_PASSWORD -> viewModel.navigateTo(ScreenDestination.CREATE_ID)
             ScreenDestination.COMPLETE_PROFILE -> viewModel.navigateTo(ScreenDestination.CREATE_PASSWORD)
+            ScreenDestination.LINK_CODE_GENERATOR -> viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+            ScreenDestination.ENTER_LINK_CODE -> viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+            ScreenDestination.STUDENT_CONTROL_CENTER -> viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+            ScreenDestination.SAFE_ZONE_CREATOR -> viewModel.navigateTo(ScreenDestination.STUDENT_CONTROL_CENTER)
+            ScreenDestination.CAMERA_REQUEST,
+            ScreenDestination.CAMERA_VIEW -> viewModel.navigateTo(ScreenDestination.STUDENT_CONTROL_CENTER)
+            ScreenDestination.CAMERA_SHARE -> viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
             ScreenDestination.REQUEST_JOURNEY,
             ScreenDestination.PARENT_APPROVAL,
             ScreenDestination.SAFETY_TIMELINE,
@@ -183,11 +195,21 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
         ScreenDestination.PROFILE
     )
 
-    WithSafeSphereWatermark {
+    val watermarkMode by viewModel.watermarkMode.collectAsState()
+    val gpsRippleTrigger by viewModel.gpsRippleTimestamp.collectAsState()
+    val geofenceAlertTrigger by viewModel.geofenceAlertTimestamp.collectAsState()
+    val watermarkStatusOverride by viewModel.watermarkStatusOverride.collectAsState()
+
+    WithSafeSphereWatermark(
+        mode = watermarkMode,
+        gpsUpdateTrigger = gpsRippleTrigger,
+        geofenceAlertTrigger = geofenceAlertTrigger,
+        statusOverride = watermarkStatusOverride
+    ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF1F5F9)),
+            .background(Color.Transparent),
         contentAlignment = Alignment.TopCenter
     ) {
         Scaffold(
@@ -195,6 +217,7 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
                 .fillMaxHeight()
                 .widthIn(max = 640.dp)
                 .testTag("safesphere_app_scaffold"),
+            containerColor = Color.Transparent,  // transparent so watermark shows through
             bottomBar = {
                 if (showBottomNav) {
                     SafeSphereBottomNavigation(
@@ -231,23 +254,25 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
                         .weight(1f)
                 ) {
                 when (currentScreen) {
+                    // ── Auth Flow: Phone → OTP → Role → Profile → Dashboard ──────────
                     ScreenDestination.SPLASH -> SplashScreen(
-                        onTimeoutOrNext = { viewModel.navigateTo(ScreenDestination.LOADING) }
+                        onTimeoutOrNext = { viewModel.navigateTo(ScreenDestination.PHONE_VERIFY) }
                     )
                     ScreenDestination.LOADING -> LoadingScreen(
-                        onLoaded = { viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE) }
+                        onLoaded = { viewModel.navigateTo(ScreenDestination.PHONE_VERIFY) }
                     )
                     ScreenDestination.CONSENT -> ConsentScreen(
                         onContinue = { viewModel.navigateTo(ScreenDestination.PHONE_VERIFY) },
-                        onBack = { viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE) }
+                        onBack = { viewModel.navigateTo(ScreenDestination.PHONE_VERIFY) }
                     )
                     ScreenDestination.PHONE_VERIFY -> PhoneVerificationScreen(
                         viewModel = viewModel,
                         onSendOtp = { viewModel.navigateTo(ScreenDestination.OTP_VERIFY) },
-                        onBack = { viewModel.navigateTo(ScreenDestination.CONSENT) }
+                        onBack = { viewModel.navigateTo(ScreenDestination.SPLASH) }
                     )
                     ScreenDestination.OTP_VERIFY -> OtpVerificationScreen(
                         viewModel = viewModel,
+                        // After OTP verified, ask who they are (Student or Parent)
                         onVerifyOtp = { viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE) },
                         onBack = { viewModel.navigateTo(ScreenDestination.PHONE_VERIFY) }
                     )
@@ -311,6 +336,25 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
                         viewModel = viewModel
                     )
                     ScreenDestination.PROFILE -> ProfileScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.LINK_CODE_GENERATOR -> LinkCodeGeneratorScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.ENTER_LINK_CODE -> EnterLinkCodeScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.STUDENT_CONTROL_CENTER -> StudentControlCenterScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.SAFE_ZONE_CREATOR -> SafeZoneCreatorScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.CAMERA_REQUEST,
+                    ScreenDestination.CAMERA_VIEW -> CameraViewScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.CAMERA_SHARE -> CameraShareScreen(
                         viewModel = viewModel
                     )
                 }

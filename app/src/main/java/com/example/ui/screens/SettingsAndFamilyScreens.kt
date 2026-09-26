@@ -87,17 +87,25 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        val isParent = viewModel.activeDashboardRole.collectAsState().value == com.example.data.model.UserRole.PARENT
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            IconButton(onClick = { viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD) }) {
+            IconButton(onClick = {
+                if (isParent) {
+                    viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+                } else {
+                    viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+                }
+            }) {
                 Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFF121C2A))
             }
             Text(text = "Settings", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
@@ -116,12 +124,14 @@ fun SettingsScreen(
                     icon = Icons.Default.Person,
                     onClick = { viewModel.navigateTo(ScreenDestination.PROFILE) }
                 )
-                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
-                SettingRowItem(
-                    title = "Family Members",
-                    icon = Icons.Default.FamilyRestroom,
-                    onClick = { viewModel.navigateTo(ScreenDestination.FAMILY_MEMBERS) }
-                )
+                if (isParent) {
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
+                    SettingRowItem(
+                        title = "Family Members",
+                        icon = Icons.Default.FamilyRestroom,
+                        onClick = { viewModel.navigateTo(ScreenDestination.FAMILY_MEMBERS) }
+                    )
+                }
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
                 Row(
                     modifier = Modifier
@@ -339,7 +349,7 @@ fun DemoSimulatorScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -476,7 +486,7 @@ fun SafeZonesScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -617,7 +627,7 @@ fun FamilyMembersScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -742,7 +752,7 @@ fun ProfileScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -753,11 +763,19 @@ fun ProfileScreen(
             label = "Profile Protected"
         )
 
+        val isParent = viewModel.activeDashboardRole.collectAsState().value == com.example.data.model.UserRole.PARENT
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            IconButton(onClick = { viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD) }) {
+            IconButton(onClick = {
+                if (isParent) {
+                    viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+                } else {
+                    viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+                }
+            }) {
                 Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFF121C2A))
             }
             Text(text = "Profile", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
@@ -776,14 +794,25 @@ fun ProfileScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(ALEX_AVATAR_URL).crossfade(true).build(),
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(if (isParent) SARAH_AVATAR_URL else ALEX_AVATAR_URL)
+                        .crossfade(true).build(),
                     contentDescription = "Profile",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(72.dp).clip(CircleShape)
                 )
 
-                Text(text = "Alex", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
-                Text(text = "10th Grade • Student", fontSize = 12.sp, color = Color(0xFF474552))
+                Text(
+                    text = if (isParent) "Sarah (Parent)" else "Alex (Student)",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF121C2A)
+                )
+                Text(
+                    text = if (isParent) "Family Primary Guardian" else "10th Grade • Lincoln High",
+                    fontSize = 12.sp,
+                    color = Color(0xFF474552)
+                )
             }
         }
 

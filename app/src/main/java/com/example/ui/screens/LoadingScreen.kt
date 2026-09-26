@@ -44,7 +44,7 @@ fun LoadingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color(0xEEFFFFFF))  // semi-transparent for watermark
             .testTag("loading_screen_root")
             .clickable { onLoaded() }
     ) {

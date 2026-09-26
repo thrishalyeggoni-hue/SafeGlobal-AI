@@ -100,7 +100,7 @@ fun PhoneVerificationScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color.Transparent)  // transparent — watermark shows from behind
             .statusBarsPadding()
             .imePadding()
             .testTag("phone_screen_root")
@@ -338,7 +338,7 @@ fun OtpVerificationScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color.Transparent)  // transparent — watermark shows from behind
             .statusBarsPadding()
             .imePadding()
             .testTag("otp_screen_root")
@@ -380,12 +380,16 @@ fun OtpVerificationScreen(
             )
 
             Text(
-                text = "Enter the 6-digit code sent to $countryCode$phone",
+                text = if (FirebaseAuthManager.isDevFallback)
+                    "SMS service unavailable — enter any 6-digit code to continue"
+                else
+                    "Enter the 6-digit code sent to $countryCode$phone",
                 fontSize = 13.sp,
-                color = Color(0xFF4B5565),
+                color = if (FirebaseAuthManager.isDevFallback) Color(0xFF059669) else Color(0xFF4B5565),
                 lineHeight = 18.sp,
                 modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
             )
+
 
             // 6-digit OTP boxes — each is a real editable text field
             Row(
@@ -540,7 +544,7 @@ fun RoleSelectionScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
+            .background(Color.Transparent)
             .statusBarsPadding()
             .testTag("role_screen_root")
     ) {

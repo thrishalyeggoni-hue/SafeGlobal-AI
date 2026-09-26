@@ -14,6 +14,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -346,52 +347,58 @@ fun SplashScreen(
             }
         }
 
-        // ── Layer 5: Central logo with pulse ───────────────────────────────
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .scale(logoScale.value * pulseBeat)
-                .alpha(logoAlpha.value),
-            contentAlignment = Alignment.Center
-        ) {
-            // Glow ring behind emblem
-            Canvas(modifier = Modifier.size(140.dp)) {
-                val cx = size.width / 2f
-                val cy = size.height / 2f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFF1D61F2).copy(alpha = 0.35f),
-                            Color(0xFF0EA5E9).copy(alpha = 0.15f),
-                            Color.Transparent
-                        ),
-                        center = Offset(cx, cy),
-                        radius = size.minDimension * 0.5f
-                    ),
-                    radius = size.minDimension * 0.5f,
-                    center = Offset(cx, cy)
-                )
-            }
-            SafeSphereEmblem(size = 118.dp)
-        }
-
-        // ── Layer 6: Brand text column ─────────────────────────────────────
+        // ── Layer 5 & 6: Unified Centered Brand Presentation (Intro Pic + SafeSphere Text) ──
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 120.dp)
-                .alpha(textAlpha.value),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 24.dp)
+                .align(Alignment.Center)
+                .alpha(textAlpha.value.coerceAtLeast(logoAlpha.value)),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            // Offset text via padding trick
+            // Intro Picture & Emblem Badge Container
+            Box(
+                modifier = Modifier
+                    .size(140.dp)
+                    .scale(logoScale.value * pulseBeat)
+                    .alpha(logoAlpha.value),
+                contentAlignment = Alignment.Center
+            ) {
+                // Glow ring behind emblem
+                Canvas(modifier = Modifier.size(140.dp)) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF1D61F2).copy(alpha = 0.45f),
+                                Color(0xFF0EA5E9).copy(alpha = 0.20f),
+                                Color.Transparent
+                            ),
+                            center = Offset(cx, cy),
+                            radius = size.minDimension * 0.5f
+                        ),
+                        radius = size.minDimension * 0.5f,
+                        center = Offset(cx, cy)
+                    )
+                }
+
+                // Intro Pic with Emblem
+                SafeSphereEmblem(size = 118.dp)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // SafeSphere Brand Text — perfectly aligned directly beneath the pic
             Box(modifier = Modifier.padding(top = textOffsetY.value.dp)) {
                 Text(
                     text = "SafeSphere",
-                    fontSize = 36.sp,
+                    fontSize = 38.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
-                    letterSpacing = (-0.5).sp
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center
                 )
             }
 
@@ -404,16 +411,17 @@ fun SplashScreen(
                     fontWeight = FontWeight.Light,
                     fontStyle = FontStyle.Italic,
                     color = Color(0xFF94A3B8),
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.alpha(taglineAlpha.value)
                 )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Tagline with shimmer
+            // Tagline shimmer separator
             Canvas(
                 modifier = Modifier
-                    .fillMaxWidth(0.7f)
+                    .fillMaxWidth(0.55f)
                     .height(1.dp)
                     .alpha(taglineAlpha.value * 0.6f)
             ) {
@@ -440,13 +448,14 @@ fun SplashScreen(
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFF64748B),
                     letterSpacing = 1.2.sp,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.alpha(taglineAlpha.value)
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-            // CTA button — tapping skips the remaining timer
+            // CTA button — cleanly positioned below the brand text
             Box(
                 modifier = Modifier
                     .alpha(ctaAlpha.value)

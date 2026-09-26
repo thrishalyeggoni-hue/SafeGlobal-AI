@@ -22,6 +22,7 @@ object FirestoreUserManager {
         }
 
     private const val COLLECTION = "users"
+    private val memoryProfileCache = mutableMapOf<String, UserProfile>()
 
     data class UserProfile(
         val uid: String = "",
@@ -41,29 +42,35 @@ object FirestoreUserManager {
     }
 
     /**
-     * Fetches the user profile from Firestore.
+     * Fetches the user profile from Firestore, with memory/local fallback.
      * Returns null if no profile exists yet (new user).
      */
     suspend fun getUserProfile(uid: String): UserProfile? {
+        memoryProfileCache[uid]?.let { return it }
         val firestore = db ?: return null
         return try {
-            withTimeoutOrNull(2000L) {
+            withTimeoutOrNull(6000L) {
                 val doc = firestore.collection(COLLECTION).document(uid).get().await()
-                if (doc.exists()) doc.toObject(UserProfile::class.java) else null
-            }
+                if (doc.exists()) {
+                    val p = doc.toObject(UserProfile::class.java)
+                    if (p != null) memoryProfileCache[uid] = p
+                    p
+                } else null
+            } ?: memoryProfileCache[uid]
         } catch (e: Exception) {
-            null
+            memoryProfileCache[uid]
         }
     }
 
     /**
-     * Creates or updates the user profile in Firestore.
+     * Creates or updates the user profile in Firestore and memory cache.
      * Uses merge so partial updates don't overwrite existing fields.
      */
     suspend fun saveUserProfile(profile: UserProfile): Result<Unit> {
+        memoryProfileCache[profile.uid] = profile
         val firestore = db ?: return Result.success(Unit) // Offline/local mode fallback
         return try {
-            withTimeoutOrNull(2000L) {
+            withTimeoutOrNull(6000L) {
                 firestore.collection(COLLECTION)
                     .document(profile.uid)
                     .set(profile, SetOptions.merge())
@@ -71,7 +78,8 @@ object FirestoreUserManager {
             }
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            // Still succeeded in local memory cache
+            Result.success(Unit)
         }
     }
 
@@ -97,7 +105,32 @@ object FirestoreUserManager {
             isProfileComplete = true,
             createdAt = System.currentTimeMillis()
         )
-        return saveUserProfile(profile)
+        // Store in users collection
+        val result = saveUserProfile(profile)
+
+        // Store each member in family_members collection in cloud database
+        db?.let { firestore ->
+            try {
+                firestore.collection("family_members")
+                    .document(safeSphereId.ifEmpty { uid })
+                    .set(
+                        mapOf(
+                            "uid" to uid,
+                            "phone" to phone,
+                            "displayName" to displayName,
+                            "role" to role.name,
+                            "gradeClass" to gradeClass,
+                            "safeSphereId" to safeSphereId,
+                            "familyId" to profile.familyId,
+                            "updatedAt" to System.currentTimeMillis()
+                        ),
+                        SetOptions.merge()
+                    )
+            } catch (e: Exception) {
+                // Non-fatal
+            }
+        }
+        return result
     }
 
     /**
@@ -137,7 +170,7 @@ object FirestoreUserManager {
         }
     }
 
-    private fun generateFamilyId(): String {
+    fun generateFamilyId(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         return "SF-" + (1..5).map { chars.random() }.joinToString("")
     }
