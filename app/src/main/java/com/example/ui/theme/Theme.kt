@@ -52,7 +52,7 @@ private val BaseLightColorScheme = lightColorScheme(
 
 @Composable
 fun SafeSphereTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     primaryAccent: Color = BrandBlue,
     content: @Composable () -> Unit
 ) {
@@ -85,3 +85,21 @@ fun SafeSphereTheme(
         content = content
     )
 }
+
+/**
+ * Standardized High-Contrast Text Field Colors ensuring dark, crisp letters on all inputs.
+ */
+@Composable
+fun darkTextFieldColors() = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Color(0xFF0F172A),
+    unfocusedTextColor = Color(0xFF0F172A),
+    focusedLabelColor = Color(0xFF1D61F2),
+    unfocusedLabelColor = Color(0xFF475569),
+    focusedPlaceholderColor = Color(0xFF94A3B8),
+    unfocusedPlaceholderColor = Color(0xFF94A3B8),
+    cursorColor = Color(0xFF1D61F2),
+    focusedBorderColor = Color(0xFF1D61F2),
+    unfocusedBorderColor = Color(0xFFCBD5E1),
+    focusedContainerColor = Color.White,
+    unfocusedContainerColor = Color.White
+)

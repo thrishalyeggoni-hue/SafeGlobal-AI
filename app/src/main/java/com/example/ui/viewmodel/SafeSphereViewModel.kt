@@ -103,6 +103,13 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     var fullNameInput = MutableStateFlow("John Doe")
     var gradeClassInput = MutableStateFlow("10th Grade")
 
+    // Dedicated 2-Login System: Student and Parent
+    var studentIdInput = MutableStateFlow("student_alex")
+    var studentPasswordInput = MutableStateFlow("AlexPass123!")
+    var parentIdInput = MutableStateFlow("parent_sarah")
+    var parentPasswordInput = MutableStateFlow("SarahPass123!")
+    var loginErrorMessage = MutableStateFlow<String?>(null)
+
     // Journey Request Form
     var journeyFrom = MutableStateFlow("School")
     var journeyTo = MutableStateFlow("Home")
@@ -119,19 +126,45 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     private val _loadingStatus = MutableStateFlow("All Protections Armed")
     val loadingStatus: StateFlow<String> = _loadingStatus.asStateFlow()
 
+    // Access control & security state
+    private val _accessDeniedMessage = MutableStateFlow<String?>(null)
+    val accessDeniedMessage: StateFlow<String?> = _accessDeniedMessage.asStateFlow()
+
+    fun dismissAccessDenied() {
+        _accessDeniedMessage.value = null
+    }
+
     fun triggerDataSync() {
         viewModelScope.launch {
             _isDataLoading.value = true
             _loadingStatus.value = "Syncing Real-time Geofence..."
-            delay(1200)
+            delay(1000)
             _loadingStatus.value = "Mutual Telemetry Synced ✓"
             _isDataLoading.value = false
-            delay(2000)
+            delay(1800)
             _loadingStatus.value = "All Protections Armed"
         }
     }
 
     fun navigateTo(destination: ScreenDestination) {
+        val currentRole = _activeDashboardRole.value
+
+        // Strict Role Separation: Students cannot access Parent Dashboard or Parental Approval
+        if (currentRole == UserRole.STUDENT) {
+            if (destination == ScreenDestination.PARENT_DASHBOARD || destination == ScreenDestination.PARENT_APPROVAL) {
+                _accessDeniedMessage.value = "🔒 Access Denied: Students are strictly restricted from accessing the Parent Dashboard and Parental Approval controls."
+                return
+            }
+        }
+
+        // Strict Role Separation: Parents cannot access Student Dashboard directly
+        if (currentRole == UserRole.PARENT) {
+            if (destination == ScreenDestination.STUDENT_DASHBOARD) {
+                _accessDeniedMessage.value = "🔒 Access Denied: Parents monitor family journeys through the Parent Dashboard and Family Map. Student Dashboard is restricted."
+                return
+            }
+        }
+
         _currentScreen.value = destination
         when (destination) {
             ScreenDestination.PARENT_DASHBOARD, ScreenDestination.STUDENT_DASHBOARD -> _currentNavTab.value = NavTab.HOME
@@ -152,19 +185,69 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
                     _currentScreen.value = ScreenDestination.STUDENT_DASHBOARD
                 }
             }
-            NavTab.FAMILY -> _currentScreen.value = ScreenDestination.FAMILY_MEMBERS
+            NavTab.FAMILY -> {
+                if (_activeDashboardRole.value == UserRole.PARENT) {
+                    _currentScreen.value = ScreenDestination.FAMILY_MEMBERS
+                } else {
+                    _currentScreen.value = ScreenDestination.SAFETY_TIMELINE
+                }
+            }
             NavTab.MAP -> _currentScreen.value = ScreenDestination.FAMILY_MAP
             NavTab.MORE -> _currentScreen.value = ScreenDestination.SETTINGS
         }
     }
 
-    fun switchDashboardRole(role: UserRole) {
-        _activeDashboardRole.value = role
-        if (role == UserRole.PARENT) {
-            _currentScreen.value = ScreenDestination.PARENT_DASHBOARD
-        } else {
+    fun loginAsStudent() {
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Authenticating Student Session..."
+            _activeDashboardRole.value = UserRole.STUDENT
+            delay(400)
             _currentScreen.value = ScreenDestination.STUDENT_DASHBOARD
+            _currentNavTab.value = NavTab.HOME
+            _isDataLoading.value = false
+            _loadingStatus.value = "All Protections Armed"
         }
+    }
+
+    fun loginAsParent() {
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Authenticating Parent Session..."
+            _activeDashboardRole.value = UserRole.PARENT
+            delay(400)
+            _currentScreen.value = ScreenDestination.PARENT_DASHBOARD
+            _currentNavTab.value = NavTab.HOME
+            _isDataLoading.value = false
+            _loadingStatus.value = "All Protections Armed"
+        }
+    }
+
+    fun logout() {
+        _currentScreen.value = ScreenDestination.CHOOSE_ROLE
+        _activeDashboardRole.value = UserRole.PARENT
+        _currentNavTab.value = NavTab.HOME
+    }
+
+    fun switchAuthenticatedAccount(role: UserRole) {
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Authenticating ${role.name.lowercase().replaceFirstChar { it.uppercase() }} Session..."
+            _activeDashboardRole.value = role
+            delay(500)
+            _currentScreen.value = if (role == UserRole.PARENT) {
+                ScreenDestination.PARENT_DASHBOARD
+            } else {
+                ScreenDestination.STUDENT_DASHBOARD
+            }
+            _currentNavTab.value = NavTab.HOME
+            _isDataLoading.value = false
+            _loadingStatus.value = "All Protections Armed"
+        }
+    }
+
+    fun switchDashboardRole(role: UserRole) {
+        switchAuthenticatedAccount(role)
     }
 
     fun setAppThemeColor(colorName: String) {

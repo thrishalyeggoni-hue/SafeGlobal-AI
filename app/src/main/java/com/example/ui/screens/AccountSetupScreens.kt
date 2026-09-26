@@ -53,7 +53,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserRole
-import com.example.ui.components.WaterWaveLoadingIndicator
+import com.example.ui.theme.darkTextFieldColors
 import com.example.ui.viewmodel.SafeSphereViewModel
 
 @Composable
@@ -94,8 +94,11 @@ fun CreateIdScreen(
                         )
                     }
 
-                    WaterWaveLoadingIndicator(
-                        label = "Create SafeSphere ID (Step 4)"
+                    Text(
+                        text = "Step 2 of 4",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF64748B)
                     )
                 }
 
@@ -129,6 +132,9 @@ fun CreateIdScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF0F172A),
+                        unfocusedTextColor = Color(0xFF0F172A),
+                        cursorColor = Color(0xFF1D61F2),
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
                         focusedIndicatorColor = Color(0xFF1D61F2),
@@ -230,8 +236,11 @@ fun CreatePasswordScreen(
                         )
                     }
 
-                    WaterWaveLoadingIndicator(
-                        label = "Create Password (Step 5)"
+                    Text(
+                        text = "Step 3 of 4",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF64748B)
                     )
                 }
 
@@ -267,6 +276,9 @@ fun CreatePasswordScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF0F172A),
+                        unfocusedTextColor = Color(0xFF0F172A),
+                        cursorColor = Color(0xFF1D61F2),
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
                         focusedIndicatorColor = Color(0xFF1D61F2),
@@ -371,8 +383,11 @@ fun CompleteProfileScreen(
                         )
                     }
 
-                    WaterWaveLoadingIndicator(
-                        label = "Complete Profile (Step 6)"
+                    Text(
+                        text = "Step 4 of 4",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF64748B)
                     )
                 }
 
@@ -447,6 +462,9 @@ fun CompleteProfileScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF0F172A),
+                        unfocusedTextColor = Color(0xFF0F172A),
+                        cursorColor = Color(0xFF1D61F2),
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
                         focusedIndicatorColor = Color(0xFF1D61F2),
@@ -476,6 +494,9 @@ fun CompleteProfileScreen(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRoleDropdownExpanded) },
                         shape = RoundedCornerShape(12.dp),
                         colors = TextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF0F172A),
+                            unfocusedTextColor = Color(0xFF0F172A),
+                            cursorColor = Color(0xFF1D61F2),
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = Color.White,
                             focusedIndicatorColor = Color(0xFF1D61F2),
@@ -523,6 +544,9 @@ fun CompleteProfileScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF0F172A),
+                        unfocusedTextColor = Color(0xFF0F172A),
+                        cursorColor = Color(0xFF1D61F2),
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
                         focusedIndicatorColor = Color(0xFF1D61F2),

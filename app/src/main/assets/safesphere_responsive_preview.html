@@ -4,343 +4,693 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0"/>
   <title>SafeSphere Family - Responsive Multi-Device Platform</title>
-  <!-- Tailwind CSS CDN with forms and container queries -->
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
   
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'Inter', '-apple-system', 'sans-serif'],
-          },
-          colors: {
-            brand: {
-              navy: '#0C2340',
-              blue: '#1652F0',
-              lightBlue: '#E8F0FE',
-              subtext: '#556882',
-            },
-            status: {
-              safe: '#006B49',
-              safeLight: '#D1FAE5',
-              safeBg: '#6FFBBE',
-              alert: '#DC2626',
-              alertBg: '#FEF2F2',
-            }
-          }
-        }
-      }
-    }
-  </script>
-
   <style>
-    /* Continuous smooth water wave animation */
-    @keyframes waveMoveFront {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
-    @keyframes waveMoveBack {
-      0% { transform: translateX(-50%); }
-      100% { transform: translateX(0); }
-    }
-    @keyframes waterPulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.04); }
-    }
-    .water-wave-front {
-      animation: waveMoveFront 3s linear infinite;
-    }
-    .water-wave-back {
-      animation: waveMoveBack 4.5s linear infinite;
-    }
-    .water-pill-pulse {
-      animation: waterPulse 2.4s ease-in-out infinite;
-    }
-
-    /* Circular dots smooth spin */
     @keyframes spinSmooth {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    .animate-spin-smooth {
-      animation: spinSmooth 1.35s linear infinite;
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.35; transform: scale(0.9); }
+      50% { opacity: 0.85; transform: scale(1.15); }
     }
-
-    /* Lazy image smooth appearance */
-    img {
-      content-visibility: auto;
-      transition: opacity 0.3s ease-in-out;
+    @keyframes progressShimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(200%); }
     }
-
+    .animate-spin-radar {
+      animation: spinSmooth 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    .animate-pulse-glow {
+      animation: pulseGlow 1.8s ease-in-out infinite;
+    }
+    .animate-shimmer {
+      animation: progressShimmer 1.4s ease-in-out infinite;
+    }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .screen-view {
+      transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center py-6 px-3 sm:px-6">
+<body class="bg-slate-900 text-slate-800 min-h-screen flex flex-col items-center py-4 px-2 sm:px-6">
 
-  <!-- TOP CENTER WATER LOADING ANIMATION -->
+  <!-- TOP CENTER BRANDED LOADING & TELEMETRY INDICATOR (Apple Dynamic Island / Uber Safety Inspired) -->
   <aside class="fixed top-2 z-50 flex items-center justify-center pointer-events-none" aria-label="SafeSphere Telemetry Sync">
-    <div class="water-pill-pulse pointer-events-auto shadow-md rounded-full bg-blue-50/95 backdrop-blur-md border border-blue-200/90 px-3.5 py-1.5 flex items-center gap-2 relative overflow-hidden h-8">
-      <!-- Ambient Wave Effect SVG Background -->
-      <div class="absolute inset-0 w-[200%] h-full opacity-35 pointer-events-none overflow-hidden">
-        <svg class="water-wave-front w-full h-full" viewBox="0 0 500 50" preserveAspectRatio="none">
-          <path d="M0,25 C150,45 250,5 500,25 L500,50 L0,50 Z" fill="#0284c7"></path>
-        </svg>
-      </div>
-      <div class="absolute inset-0 w-[200%] h-full opacity-25 pointer-events-none overflow-hidden">
-        <svg class="water-wave-back w-full h-full" viewBox="0 0 500 50" preserveAspectRatio="none">
-          <path d="M0,20 C180,5 320,40 500,20 L500,50 L0,50 Z" fill="#38bdf8"></path>
+    <div id="top-branded-pill" class="pointer-events-auto shadow-2xl rounded-full bg-slate-950/95 backdrop-blur-xl border border-sky-400/40 px-3.5 py-1.5 flex items-center gap-2.5 relative overflow-hidden h-9 transition-all duration-300">
+      
+      <!-- Active Orbital Radar Arc (shown when syncing / loading) -->
+      <div id="radar-spinner" class="hidden w-4 h-4 relative flex items-center justify-center">
+        <svg class="animate-spin-radar w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+          <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
       </div>
 
-      <!-- Foreground live telemetry status -->
-      <span class="relative z-10 w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-      <span class="relative z-10 w-2 h-2 rounded-full bg-emerald-500 -ml-4"></span>
-      <span class="relative z-10 text-[11px] font-bold text-slate-900 tracking-wide" id="top-water-status-label">All Protections Armed</span>
-      <button class="relative z-10 text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full hover:bg-blue-200 transition-colors" onclick="triggerFastSync()">Sync</button>
+      <!-- Idle Steady Green Security Beacon (shown when idle) -->
+      <div id="idle-beacon" class="flex items-center justify-center relative w-3.5 h-3.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-emerald-400/30 animate-pulse-glow absolute"></span>
+        <span class="w-2 h-2 rounded-full bg-emerald-400 relative z-10 shadow-sm"></span>
+      </div>
+
+      <!-- Live Dynamic Label -->
+      <span class="relative z-10 text-[11px] font-semibold text-slate-100 tracking-wide" id="top-loading-status-label">All Protections Armed</span>
+
+      <!-- Fast Sync Action Button -->
+      <button class="relative z-10 text-[9px] font-bold text-sky-400 bg-sky-950 hover:bg-sky-900 border border-sky-500/40 px-2 py-0.5 rounded-full transition-all active:scale-95" onclick="triggerFastSync()">SYNC</button>
+
+      <!-- Bottom Micro Glowing Shimmer Line -->
+      <div id="shimmer-bar" class="hidden absolute bottom-0 left-0 right-0 h-[2px] bg-slate-800 overflow-hidden">
+        <div class="w-1/2 h-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-shimmer"></div>
+      </div>
     </div>
   </aside>
 
-  <!-- SCREEN SWITCHER & RESPONSIVE DEVICE CONTROLS -->
-  <header class="w-full max-w-4xl mt-10 mb-4 flex flex-col items-center gap-3">
-    <div class="flex items-center justify-between w-full px-2">
-      <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">S</div>
-        <h1 class="text-sm font-bold text-slate-900">SafeSphere Family Preview</h1>
+  <!-- SECURITY ACCESS DENIED MODAL -->
+  <div id="access-denied-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl flex flex-col items-center text-center gap-3 border border-red-100 animate-in fade-in zoom-in-95">
+      <div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center text-2xl shadow-inner">🔒</div>
+      <h3 class="text-base font-bold text-slate-900">Security Access Restricted</h3>
+      <p class="text-xs text-slate-600 leading-relaxed" id="access-denied-message">Students cannot access the Parent Dashboard. Role separation is strictly enforced.</p>
+      <button class="w-full mt-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95" onclick="closeAccessDeniedModal()">Acknowledge</button>
+    </div>
+  </div>
+
+  <!-- HEADER & RESPONSIVE DEVICE CONTROLS -->
+  <header class="w-full max-w-6xl mt-12 mb-3 flex flex-col items-center gap-2.5">
+    <div class="flex items-center justify-between w-full px-2 text-white">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-extrabold text-sm shadow-md">S</div>
+        <div>
+          <h1 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+            SafeSphere Family
+            <span class="text-[10px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full">Multi-Device Preview</span>
+          </h1>
+          <p class="text-[11px] text-slate-400 hidden sm:block">Mobile • Foldable / Tablet • Desktop Viewport Matrix</p>
+        </div>
       </div>
-      <span class="text-xs text-slate-500 hidden sm:inline">Responsive Layouts: Mobile • Tablet • Desktop</span>
+
+      <!-- Role Session Switcher Pill -->
+      <div class="flex items-center gap-2 bg-slate-800/90 border border-slate-700 p-1 rounded-2xl shadow-sm">
+        <span class="text-[11px] font-bold text-slate-300 px-2 flex items-center gap-1.5" id="active-role-badge">
+          <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+          Parent Session
+        </span>
+        <button class="text-[10.5px] font-bold bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-xl transition-all shadow-sm active:scale-95" onclick="toggleActiveRole()" id="switch-role-btn">
+          Switch to Student
+        </button>
+      </div>
     </div>
 
-    <!-- Scrollable Screen Tabs -->
-    <nav class="w-full bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-1 overflow-x-auto no-scrollbar text-xs font-semibold">
-      <button class="screen-tab px-3 py-1.5 rounded-xl bg-blue-600 text-white whitespace-nowrap shadow-sm transition-all" onclick="showScreen('screen-parent-dash', this)">Parent Dash</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-student-dash', this)">Student Dash</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-map', this)">Family Map</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-consent', this)">Consent Notice</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-phone', this)">Phone Verify</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-otp', this)">Verify OTP</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-role', this)">Choose Role</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-request', this)">Request Journey</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-approval', this)">Parent Approval</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-timeline', this)">Timeline</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-emergency', this)">Emergency SOS</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-settings', this)">Settings</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-splash', this)">Splash Screen</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all" onclick="showScreen('screen-loading', this)">Loading Screen</button>
+    <!-- Scrollable Screen Navigation Tabs with Role Segregation -->
+    <nav class="w-full bg-slate-800/80 backdrop-blur-md p-1.5 rounded-2xl shadow-inner border border-slate-700 flex items-center gap-1 overflow-x-auto no-scrollbar text-xs font-semibold">
+      <button class="screen-tab px-3 py-1.5 rounded-xl bg-blue-600 text-white whitespace-nowrap shadow-sm transition-all" id="tab-parent-dash" onclick="tryNavigate('screen-parent-dash', this, 'PARENT')">Parent Dash</button>
+      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" id="tab-student-dash" onclick="tryNavigate('screen-student-dash', this, 'STUDENT')">🔒 Student Dash</button>
+      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-map', this, 'ALL')">Family Map</button>
+      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" id="tab-parent-approval" onclick="tryNavigate('screen-approval', this, 'PARENT')">Parent Approval</button>
+      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-request', this, 'ALL')">Request Journey</button>
+      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-timeline', this, 'ALL')">Timeline</button>
+      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-emergency', this, 'ALL')">Emergency SOS</button>
+      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-settings', this, 'ALL')">Settings</button>
     </nav>
   </header>
 
-  <!-- RESPONSIVE WRAPPER (Fluid Mobile, Tablet multi-pane, or centered Desktop) -->
-  <main class="w-full max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-4xl bg-white rounded-3xl shadow-xl border border-slate-200/80 overflow-hidden flex flex-col relative transition-all">
+  <!-- RESPONSIVE MULTI-DEVICE VIEWPORT CONTAINER (Mobile 380px, Tablet 768px, Desktop 1024px Grid) -->
+  <main class="w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col relative transition-all min-h-[580px]">
 
-    <!-- SCREEN: PARENT DASHBOARD -->
-    <section class="screen-view p-4 sm:p-6 flex flex-col gap-4" id="screen-parent-dash">
-      <div class="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-        <div class="flex items-center gap-3">
-          <img class="w-12 h-12 rounded-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBepeTT9JgUhM_4UA9RfwDJaKbp46wuanseosEJlXGHRbdLfCCv2e78KL3HuJSUD_sdZRH05LwXxuonC5NT8zeqQ5GJAXDZn_cpyT1Tku0ypDraOJYN1j-mTnQwAfolLIle1y2FCvEjPO9PCXvz-Ld7j-QeZwHulp_oobzvSPZWJiBL45iDDZIsWHhBOUTCuJv6N7XmICWF10-5emaEw4zGY7AlSHeQw0Zhi8ov8fZ0sid-Pr0OLKHkQQ" alt="Sarah"/>
+    <!-- ===================== SCREEN: PARENT DASHBOARD ===================== -->
+    <section class="screen-view p-4 sm:p-6 lg:p-8 flex flex-col gap-4" id="screen-parent-dash">
+      <!-- Role Security Header Banner -->
+      <div class="bg-blue-50/90 border border-blue-200/80 p-3 rounded-2xl flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-full bg-blue-600/10 text-blue-700 flex items-center justify-center font-bold text-xs">🛡️</div>
           <div>
-            <span class="text-[10px] font-bold text-blue-600 tracking-wider">SAFESPHERE FAMILY</span>
-            <h2 class="text-base sm:text-lg font-bold text-slate-900">Good Morning, Sarah</h2>
-            <span class="text-xs text-slate-500">Role: Parent • All protections armed</span>
+            <span class="text-xs font-bold text-blue-900 block">Parent Account • Governance Mode Active</span>
+            <span class="text-[10px] text-blue-700">Student access strictly prohibited • Geofence &amp; Consent Active</span>
           </div>
         </div>
-        <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700">🔔</div>
+        <span class="text-[10.5px] font-bold text-blue-800 bg-white border border-blue-200 px-2 py-0.5 rounded-full">Encrypted</span>
       </div>
 
-      <!-- Safe Status Banner -->
-      <div class="bg-emerald-300 text-emerald-950 p-4 rounded-2xl flex items-center justify-between shadow-sm">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-emerald-900/15 flex items-center justify-center font-bold">🛡️</div>
-          <div>
-            <h3 class="text-sm font-bold">Your family is safe</h3>
-            <p class="text-xs opacity-90">2 active devices • Geofence check intact</p>
-          </div>
-        </div>
-        <span class="px-2.5 py-1 rounded-full bg-emerald-800 text-white font-bold text-xs">Active</span>
-      </div>
-
-      <!-- Family Members -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3">
-        <div class="flex justify-between items-center">
-          <h3 class="font-bold text-slate-900 text-sm">Family Members</h3>
-          <span class="text-xs font-semibold text-blue-600 cursor-pointer">View All &gt;</span>
-        </div>
-        <div class="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl flex items-center justify-between cursor-pointer transition-colors" onclick="showScreenById('screen-map')">
-          <div class="flex items-center gap-3">
-            <img class="w-10 h-10 rounded-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="font-bold text-sm text-slate-900">Alex</span>
-                <span class="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Student</span>
+      <!-- Responsive Grid for Tablet / Desktop Reflow -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <!-- Left Column: User Profile & Safe Status (Col 1 on Desktop) -->
+        <div class="flex flex-col gap-3 md:col-span-1">
+          <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+            <div class="flex items-center gap-3">
+              <img class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBepeTT9JgUhM_4UA9RfwDJaKbp46wuanseosEJlXGHRbdLfCCv2e78KL3HuJSUD_sdZRH05LwXxuonC5NT8zeqQ5GJAXDZn_cpyT1Tku0ypDraOJYN1j-mTnQwAfolLIle1y2FCvEjPO9PCXvz-Ld7j-QeZwHulp_oobzvSPZWJiBL45iDDZIsWHhBOUTCuJv6N7XmICWF10-5emaEw4zGY7AlSHeQw0Zhi8ov8fZ0sid-Pr0OLKHkQQ" alt="Sarah"/>
+              <div>
+                <span class="text-[9.5px] font-bold text-blue-600 tracking-wider block">SAFESPHERE FAMILY</span>
+                <h2 class="text-sm sm:text-base font-bold text-slate-900">Good Morning, Sarah</h2>
+                <span class="text-[11px] text-slate-500">Role: Parent • All Protections</span>
               </div>
-              <span class="text-xs text-slate-500">On trip • 2h 15m remaining</span>
             </div>
           </div>
-          <span class="text-slate-400 font-bold">&gt;</span>
+
+          <div class="bg-emerald-500 text-white p-4 rounded-2xl shadow-md flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">🛡️</div>
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold">Your family is safe</h3>
+                <p class="text-[11px] text-emerald-100">2 active devices • Safe Zone intact</p>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-emerald-700 text-white font-bold text-xs">Active</span>
+          </div>
+
+          <!-- Family Members List -->
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-2.5">
+            <div class="flex justify-between items-center">
+              <h3 class="font-bold text-slate-900 text-xs">Monitored Family</h3>
+              <span class="text-[10.5px] font-semibold text-blue-600 cursor-pointer" onclick="tryNavigate('screen-map', null, 'ALL')">View Map &gt;</span>
+            </div>
+            <div class="bg-slate-50 hover:bg-slate-100 p-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-colors" onclick="tryNavigate('screen-map', null, 'ALL')">
+              <div class="flex items-center gap-2.5">
+                <img class="w-9 h-9 rounded-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-xs text-slate-900">Alex</span>
+                    <span class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">Student</span>
+                  </div>
+                  <span class="text-[10.5px] text-slate-500">In Transit • 12m ETA</span>
+                </div>
+              </div>
+              <span class="text-blue-600 font-bold text-xs">&gt;</span>
+            </div>
+          </div>
         </div>
+
+        <!-- Center & Right Columns: Live Telemetry & Actions (Col 2-3 on Desktop) -->
+        <div class="flex flex-col gap-3 md:col-span-2">
+          
+          <!-- Live Telemetry Card with Map Preview -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-2.5">
+            <div class="flex justify-between items-center text-xs">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span class="font-bold text-slate-900">Live Student Telemetry</span>
+              </div>
+              <span class="text-slate-400 text-[10.5px]">GPS verified • 3s ago</span>
+            </div>
+            
+            <div class="w-full h-44 sm:h-52 rounded-2xl bg-cover bg-center relative overflow-hidden flex items-end p-3 cursor-pointer shadow-inner" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA5M71byQCisxmdNnL9pdkBu4GtwGLYvoWFy4qUF07avfES8Y39y2XZQk5XaUAeyq4x0AJ5zzr0wSyFO3OcBzWRXesEvKzdpJ6mDDZAbevhI2PEPV6FEMDmqktBJpRx0CrYvu6h5Flfbdmxow2VQyevv52m01abUrFtnIhBvieqAwh86BLIUhk4uQSgwLPa9ppXsL_dcevAIFqfPAjJQH_Kw0yXWsZyO1IR5lCw67V0hvGnT5r47Zxmig');" onclick="tryNavigate('screen-map', null, 'ALL')">
+              <div class="bg-white/95 backdrop-blur-md p-3 rounded-xl w-full flex items-center justify-between shadow-md">
+                <div>
+                  <span class="block text-xs font-bold text-slate-900">Highland Way &amp; 4th Ave</span>
+                  <span class="block text-[10.5px] text-slate-500">En route to North Community Library</span>
+                </div>
+                <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3.5 py-1.5 rounded-xl font-bold shadow-sm transition-all active:scale-95">Open Live Map</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions Grid (Reflows 2x2 on Mobile, 4-col on Tablet/Desktop) -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+            <div class="bg-slate-50 hover:bg-blue-50 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all border border-slate-100" onclick="tryNavigate('screen-approval', null, 'PARENT')">
+              <span class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg">🛡️</span>
+              <span class="text-[11px] font-semibold text-slate-800 leading-tight">Parent Approvals</span>
+            </div>
+            <div class="bg-slate-50 hover:bg-indigo-50 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all border border-slate-100" onclick="tryNavigate('screen-map', null, 'ALL')">
+              <span class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg">📍</span>
+              <span class="text-[11px] font-semibold text-slate-800 leading-tight">Safe Zones</span>
+            </div>
+            <div class="bg-slate-50 hover:bg-emerald-50 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all border border-slate-100" onclick="tryNavigate('screen-timeline', null, 'ALL')">
+              <span class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">⏱️</span>
+              <span class="text-[11px] font-semibold text-slate-800 leading-tight">Safety Timeline</span>
+            </div>
+            <div class="bg-slate-50 hover:bg-red-50 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all border border-slate-100" onclick="tryNavigate('screen-emergency', null, 'ALL')">
+              <span class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-lg font-bold">🚨</span>
+              <span class="text-[11px] font-semibold text-red-600 leading-tight font-bold">Emergency SOS</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ===================== SCREEN: STUDENT DASHBOARD ===================== -->
+    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-student-dash">
+      <!-- Role Security Header Banner -->
+      <div class="bg-emerald-50/90 border border-emerald-200/80 p-3 rounded-2xl flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-full bg-emerald-600/10 text-emerald-700 flex items-center justify-center font-bold text-xs">🎒</div>
+          <div>
+            <span class="text-xs font-bold text-emerald-950 block">Student Account • Monitored Corridor Active</span>
+            <span class="text-[10px] text-emerald-700">🔒 Parent controls strictly locked • Autonomous Journey Tracking</span>
+          </div>
+        </div>
+        <span class="text-[10.5px] font-bold text-emerald-800 bg-white border border-emerald-200 px-2 py-0.5 rounded-full">Secure</span>
       </div>
 
-      <!-- Quick Actions Grid -->
-      <div class="grid grid-cols-4 gap-2 text-center">
-        <div class="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all" onclick="showScreenById('screen-request')">
-          <span class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg">🚗</span>
-          <span class="text-[11px] font-medium text-slate-800 leading-tight">Request Journey</span>
-        </div>
-        <div class="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all" onclick="showScreenById('screen-map')">
-          <span class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg">📍</span>
-          <span class="text-[11px] font-medium text-slate-800 leading-tight">Set Safe Zone</span>
-        </div>
-        <div class="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all" onclick="showScreenById('screen-emergency')">
-          <span class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-lg">🚨</span>
-          <span class="text-[11px] font-medium text-red-600 leading-tight font-bold">Emergency SOS</span>
-        </div>
-        <div class="bg-slate-50 hover:bg-slate-100 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all" onclick="showScreenById('screen-settings')">
-          <span class="w-10 h-10 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-lg">⚙️</span>
-          <span class="text-[11px] font-medium text-slate-800 leading-tight">Settings</span>
-        </div>
-      </div>
-
-      <!-- Live Telemetry Card -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-2">
-        <div class="flex justify-between items-center text-xs">
-          <span class="font-bold text-slate-900">Live Telemetry</span>
-          <span class="text-slate-500">Updated 30s ago</span>
-        </div>
-        <div class="w-full h-36 rounded-2xl bg-cover bg-center relative overflow-hidden flex items-end p-3 cursor-pointer" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA5M71byQCisxmdNnL9pdkBu4GtwGLYvoWFy4qUF07avfES8Y39y2XZQk5XaUAeyq4x0AJ5zzr0wSyFO3OcBzWRXesEvKzdpJ6mDDZAbevhI2PEPV6FEMDmqktBJpRx0CrYvu6h5Flfbdmxow2VQyevv52m01abUrFtnIhBvieqAwh86BLIUhk4uQSgwLPa9ppXsL_dcevAIFqfPAjJQH_Kw0yXWsZyO1IR5lCw67V0hvGnT5r47Zxmig');" onclick="showScreenById('screen-map')">
-          <div class="bg-white/95 backdrop-blur-md p-2.5 rounded-xl w-full flex items-center justify-between">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Student Greeting Card -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <img class="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow-sm" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
             <div>
-              <span class="block text-xs font-bold text-slate-900">Highland Way &amp; 4th Ave</span>
-              <span class="block text-[10px] text-slate-500">En route to North Community...</span>
+              <h2 class="text-base font-bold text-slate-900">Hi Alex! 👋</h2>
+              <span class="text-xs font-medium text-emerald-600">Active Safe Corridor: En route to Home</span>
             </div>
-            <button class="bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-bold">Track</button>
           </div>
+          <span class="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">Protected</span>
+        </div>
+
+        <!-- Active Journey Banner -->
+        <div class="bg-gradient-to-br from-emerald-800 to-emerald-950 text-white p-5 rounded-2xl shadow-lg flex flex-col gap-3">
+          <div class="flex justify-between items-center">
+            <span class="text-[10px] font-bold tracking-wider text-emerald-300">JOURNEY IN PROGRESS</span>
+            <span class="text-xs font-bold bg-emerald-600/40 border border-emerald-400/40 px-2 py-0.5 rounded-full">GPS Live</span>
+          </div>
+          <div class="flex justify-between items-end">
+            <div>
+              <span class="text-lg font-extrabold block">12 Minutes Remaining</span>
+              <span class="text-xs text-emerald-200">2.4 km • Expected Arrival 5:00 PM</span>
+            </div>
+            <button class="bg-white text-emerald-950 text-xs font-bold px-3.5 py-1.5 rounded-xl hover:bg-emerald-50 transition-all shadow-sm active:scale-95" onclick="tryNavigate('screen-map', null, 'ALL')">Live Route</button>
+          </div>
+          <div class="w-full bg-emerald-900/60 rounded-full h-2 overflow-hidden">
+            <div class="bg-emerald-400 h-full rounded-full w-2/3"></div>
+          </div>
+        </div>
+
+        <!-- Request New Journey Action -->
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer hover:bg-blue-50 transition-colors" onclick="tryNavigate('screen-request', null, 'ALL')">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-lg">🚗</div>
+            <div>
+              <h4 class="text-xs font-bold text-slate-900">Request New Travel Route</h4>
+              <span class="text-[10.5px] text-slate-500">Sends instant approval request to Sarah</span>
+            </div>
+          </div>
+          <span class="text-blue-600 font-bold">&gt;</span>
+        </div>
+
+        <!-- Student SOS Button -->
+        <div class="bg-red-50 p-4 rounded-2xl border border-red-200 flex items-center justify-between cursor-pointer hover:bg-red-100 transition-colors" onclick="tryNavigate('screen-emergency', null, 'ALL')">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center text-lg font-bold">🚨</div>
+            <div>
+              <h4 class="text-xs font-bold text-red-900">Silent SOS &amp; Duress Alert</h4>
+              <span class="text-[10.5px] text-red-700">Instant broadcast to Sarah &amp; trusted contacts</span>
+            </div>
+          </div>
+          <span class="text-red-700 font-bold">&gt;</span>
         </div>
       </div>
     </section>
 
-    <!-- SCREEN: FAMILY MAP -->
-    <section class="screen-view p-4 sm:p-6 hidden flex flex-col gap-4" id="screen-map">
+
+    <!-- ===================== SCREEN: FAMILY MAP ===================== -->
+    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-map">
       <div class="flex items-center justify-between">
-        <button class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-bold" onclick="showScreenById('screen-parent-dash')">&larr;</button>
-        <div>
-          <h2 class="font-bold text-sm text-slate-900">Family Map</h2>
-          <span class="text-[11px] text-slate-500">Live mutual sharing active</span>
+        <div class="flex items-center gap-3">
+          <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
+          <div>
+            <h2 class="font-bold text-sm sm:text-base text-slate-900">Live Family Map</h2>
+            <span class="text-[11px] text-slate-500">High-Precision Mutual GPS Sharing</span>
+          </div>
         </div>
-        <button class="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold" onclick="triggerFastSync()">Refresh GPS</button>
+        <button class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all" onclick="triggerFastSync()">Sync GPS</button>
       </div>
 
-      <!-- Map Canvas with Hotlinked Map Image and Route SVG -->
-      <div class="w-full h-72 sm:h-96 rounded-3xl bg-cover bg-center relative overflow-hidden shadow-inner" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBQD83Ecc27kbK3Kr4hzwzSM84-goC0l95Y24Wm4lUTe6wBAIZZ-8JROIhBaGfJZGvCJoTmtTO2kgFtFgIn6W1k2OAnE6fY-fdgGmFfCdPoWNduUmJj_TBnytELb0SujIgXEikoBuUxvQYIXkafT0uDuhIDRVf4JMZgytKefncEd1MO4V1-xmGte1Vktf0kouwbJHKDDhAFoLeYpy4Yb1ItWYT1Ze08YzdTMp9WzbvKAUsXoktLFnDfzA');">
-        <!-- Safe Zone Perimeter Indicator -->
-        <div class="absolute top-12 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10.5px] font-bold text-emerald-800 shadow-sm flex items-center gap-1.5">
-          <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-          Safe Zone (Lincoln School)
+      <!-- Map Display with Seattle Real Map Visual Asset -->
+      <div class="w-full h-80 sm:h-96 rounded-3xl bg-cover bg-center relative overflow-hidden shadow-inner border border-slate-200" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBQD83Ecc27kbK3Kr4hzwzSM84-goC0l95Y24Wm4lUTe6wBAIZZ-8JROIhBaGfJZGvCJoTmtTO2kgFtFgIn6W1k2OAnE6fY-fdgGmFfCdPoWNduUmJj_TBnytELb0SujIgXEikoBuUxvQYIXkafT0uDuhIDRVf4JMZgytKefncEd1MO4V1-xmGte1Vktf0kouwbJHKDDhAFoLeYpy4Yb1ItWYT1Ze08YzdTMp9WzbvKAUsXoktLFnDfzA');">
+        
+        <!-- Safe Zone Badge -->
+        <div class="absolute top-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.2 rounded-full text-[11px] font-bold text-emerald-900 shadow-md flex items-center gap-2 border border-emerald-200">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+          Safe Zone: Lincoln High School (300m)
         </div>
 
-        <!-- Alex Moving Pin with Pulsing Aura -->
+        <!-- Student Location Pin Marker -->
         <div class="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-          <div class="w-12 h-12 rounded-full bg-blue-400/40 animate-ping absolute"></div>
-          <img class="w-10 h-10 rounded-full border-2 border-blue-600 relative z-10 object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
+          <div class="w-16 h-16 rounded-full bg-blue-500/30 animate-ping absolute"></div>
+          <div class="w-12 h-12 rounded-full bg-blue-600/20 absolute"></div>
+          <img class="w-10 h-10 rounded-full border-2 border-white shadow-xl relative z-10 object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
         </div>
       </div>
 
-      <!-- Telemetry Card (Alex) -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3">
+      <!-- Telemetry Info Row -->
+      <div class="grid grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
+        <div>
+          <span class="text-[10px] text-slate-500 block">Remaining</span>
+          <span class="font-bold text-xs sm:text-sm text-slate-900">2.4 km</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 block">Est. Arrival</span>
+          <span class="font-bold text-xs sm:text-sm text-slate-900">5:00 PM</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 block">Device Battery</span>
+          <span class="font-bold text-xs sm:text-sm text-emerald-600">84% ⚡</span>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ===================== SCREEN: PARENT APPROVAL ===================== -->
+    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-approval">
+      <div class="flex items-center gap-3">
+        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
+        <div>
+          <h2 class="font-bold text-sm sm:text-base text-slate-900">Parental Travel Consent</h2>
+          <span class="text-[11px] text-slate-500">Student Route Approval Request</span>
+        </div>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-base">⚠️</span>
+          <h3 class="text-xs font-bold text-amber-950">Approval Required for Travel Corridor</h3>
+        </div>
+        <p class="text-xs text-amber-900">Alex requested permission to travel from School to North Community Library by Car.</p>
+      </div>
+
+      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-3">
+        <div class="flex justify-between text-xs py-1 border-b border-slate-200">
+          <span class="text-slate-500">Origin</span>
+          <span class="font-bold text-slate-900">Lincoln High School</span>
+        </div>
+        <div class="flex justify-between text-xs py-1 border-b border-slate-200">
+          <span class="text-slate-500">Destination</span>
+          <span class="font-bold text-slate-900">North Community Library</span>
+        </div>
+        <div class="flex justify-between text-xs py-1 border-b border-slate-200">
+          <span class="text-slate-500">Travel Mode</span>
+          <span class="font-bold text-blue-600">Car / Vehicle</span>
+        </div>
+        <div class="flex justify-between text-xs py-1">
+          <span class="text-slate-500">Expected Arrival</span>
+          <span class="font-bold text-slate-900">5:00 PM (18 min trip)</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 mt-2">
+        <button class="py-3 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-xl transition-all" onclick="denyJourney()">Decline Route</button>
+        <button class="py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all" onclick="approveJourney()">Grant Consent &amp; Track</button>
+      </div>
+    </section>
+
+
+    <!-- ===================== SCREEN: REQUEST JOURNEY ===================== -->
+    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-request">
+      <div class="flex items-center gap-3">
+        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
+        <div>
+          <h2 class="font-bold text-sm sm:text-base text-slate-900">Request Travel Corridor</h2>
+          <span class="text-[11px] text-slate-500">Submit route for parental consent verification</span>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
+        <div>
+          <label class="text-xs font-bold text-slate-700 block mb-1">Origin Location</label>
+          <input type="text" value="Lincoln High School" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"/>
+        </div>
+        <div>
+          <label class="text-xs font-bold text-slate-700 block mb-1">Destination Location</label>
+          <input type="text" value="North Community Library" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"/>
+        </div>
+        <div>
+          <label class="text-xs font-bold text-slate-700 block mb-1">Travel Mode</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button class="py-2 rounded-xl bg-blue-600 text-white text-xs font-bold">🚗 Car</button>
+            <button class="py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200">🚌 Bus</button>
+            <button class="py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200">🚶 Walk</button>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-bold text-slate-700 block mb-1">Estimated Arrival Time</label>
+          <input type="text" value="5:00 PM" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"/>
+        </div>
+
+        <button class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all mt-2" onclick="submitJourney()">Submit for Parent Consent</button>
+      </div>
+    </section>
+
+
+    <!-- ===================== SCREEN: TIMELINE ===================== -->
+    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-timeline">
+      <div class="flex items-center gap-3">
+        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
+        <div>
+          <h2 class="font-bold text-sm sm:text-base text-slate-900">Safety Timeline</h2>
+          <span class="text-[11px] text-slate-500">Immutable geofence &amp; check-in audit log</span>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">🚗</div>
+          <div class="flex-1">
+            <span class="text-xs font-bold text-slate-900 block">En Route: Highland Way</span>
+            <span class="text-[10px] text-slate-500">4:22 PM • Speed 32 km/h • Risk Normal</span>
+          </div>
+          <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Live</span>
+        </div>
+
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">✓</div>
+          <div class="flex-1">
+            <span class="text-xs font-bold text-slate-900 block">Parent Consent Confirmed</span>
+            <span class="text-[10px] text-slate-500">4:14 PM • Sarah granted corridor access</span>
+          </div>
+          <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Approved</span>
+        </div>
+
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">📍</div>
+          <div class="flex-1">
+            <span class="text-xs font-bold text-slate-900 block">Exited Safe Zone: Lincoln High</span>
+            <span class="text-[10px] text-slate-500">4:10 PM • Geofence departure recorded</span>
+          </div>
+          <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">Logged</span>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ===================== SCREEN: EMERGENCY SOS ===================== -->
+    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-emergency">
+      <div class="flex items-center gap-3">
+        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
+        <div>
+          <h2 class="font-bold text-sm sm:text-base text-slate-900">Emergency Duress Center</h2>
+          <span class="text-[11px] text-slate-500">Instant multi-channel emergency broadcast</span>
+        </div>
+      </div>
+
+      <div class="bg-red-500 text-white p-5 rounded-3xl shadow-lg flex flex-col items-center text-center gap-3">
+        <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-3xl animate-bounce">🚨</div>
+        <h3 class="text-base font-bold">Emergency Alert Broadcast</h3>
+        <p class="text-xs text-red-100 max-w-sm">Pressing the SOS button transmits immediate GPS coordinates, initiates audio verification, and notifies emergency services.</p>
+        <button class="w-full max-w-xs py-3.5 bg-white text-red-600 font-extrabold text-sm rounded-2xl shadow-xl hover:bg-red-50 transition-all active:scale-95" onclick="triggerSOSAlert()">TRIGGER SOS ALERT</button>
+      </div>
+
+      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-2">
+        <span class="text-xs font-bold text-slate-800">Primary Trusted Contact</span>
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <img class="w-11 h-11 rounded-2xl object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="font-bold text-slate-900 text-sm">Alex</span>
-                <span class="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">In Transit</span>
-              </div>
-              <span class="text-xs text-slate-500">On the way to Home</span>
-            </div>
-          </div>
-          <a class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold" href="tel:+919876543210">📞</a>
+          <span class="text-xs text-slate-600">Sarah Sharma (Parent)</span>
+          <a href="tel:+919876543210" class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-xl">Call +91 98765 43210</a>
         </div>
-
-        <div class="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl text-center">
-          <div>
-            <span class="text-[10px] text-slate-500 block">ETA</span>
-            <span class="font-bold text-xs text-slate-900">12 min</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">Remaining</span>
-            <span class="font-bold text-xs text-slate-900">2.4 km</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">Battery</span>
-            <span class="font-bold text-xs text-emerald-700">84%</span>
-          </div>
-        </div>
-
-        <button class="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all" onclick="toggleArrivalAlert(this)">Notify on Arrival</button>
       </div>
     </section>
 
-    <!-- SCREEN: SPLASH SCREEN -->
-    <section class="screen-view p-8 hidden flex flex-col items-center justify-center min-h-[500px] text-center" id="screen-splash">
-      <img class="w-28 h-28 object-contain mb-4" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9AoEQSy3MyN3v8pE1-hWTuBx2ASiNB2gkxPpwtTTMUSGlmnk5wYhFTrs-kv6aUkZcggjoqJLGK4g9dTJs3vG0M43AN6g-_5ZhqMvBVXD9BDbXpucS1hK0Bx9TBoPnUekvb9KoMytUwvIeA0ahO7zwJzX_fiq-4QKJnD_jLp7XClcjam1D9WA1T933HK-9kRz1USBBVt-aRXt43FsKpCOgRKKG5lIMYUxhaq-sR02fBAhZ8jOtfV7x9FuuJlDrQ8YJUJA" alt="SafeSphere Logo"/>
-      <h2 class="text-3xl font-extrabold text-slate-900">SafeSphere</h2>
-      <span class="text-xl italic font-serif text-slate-800 -mt-1">Family</span>
-      <p class="text-sm font-medium text-slate-600 mt-3">Verify. Monitor. Protect.</p>
-      <button class="mt-6 px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl text-xs" onclick="showScreenById('screen-parent-dash')">Open Application</button>
-    </section>
 
-    <!-- SCREEN: LOADING SCREEN -->
-    <section class="screen-view p-8 hidden flex flex-col items-center justify-center min-h-[500px] text-center" id="screen-loading">
-      <img class="w-20 h-20 object-contain mb-3" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9AoEQSy3MyN3v8pE1-hWTuBx2ASiNB2gkxPpwtTTMUSGlmnk5wYhFTrs-kv6aUkZcggjoqJLGK4g9dTJs3vG0M43AN6g-_5ZhqMvBVXD9BDbXpucS1hK0Bx9TBoPnUekvb9KoMytUwvIeA0ahO7zwJzX_fiq-4QKJnD_jLp7XClcjam1D9WA1T933HK-9kRz1USBBVt-aRXt43FsKpCOgRKKG5lIMYUxhaq-sR02fBAhZ8jOtfV7x9FuuJlDrQ8YJUJA" alt="SafeSphere Logo"/>
-      <h3 class="text-xl font-bold text-slate-900">SafeSphere Family</h3>
-      <div class="w-14 h-14 my-8">
-        <img class="w-full h-full object-contain animate-spin-smooth" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxfSdp2c2pVb8o5cD2Dr-bEE_Vchhf8AKfLrs-U7B3w8u6AZymavtNJ8ZDgNArm_gEwoorwB-W9D2CUmPohfwicpzunkqaLL9IoYPHUd98Wgd7BwOLKDL4SG7GkWWl2EXXSp--hTGRWwEJi7qmAIo7abVisZKh69mUDTdxMfNG3urCkL9JJQFImaB4scoF5z5Er4L9auGX5Fx9qEjHaR0-foAkmz6aNef1OXEwI8BYhRi80VrvyEOrgchftSr4137sJkg" alt="Loader"/>
+    <!-- ===================== SCREEN: SETTINGS ===================== -->
+    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-settings">
+      <div class="flex items-center gap-3">
+        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
+        <div>
+          <h2 class="font-bold text-sm sm:text-base text-slate-900">Safety &amp; Privacy Settings</h2>
+          <span class="text-[11px] text-slate-500">Mutual consent tokens &amp; security parameters</span>
+        </div>
       </div>
-      <p class="text-xs font-medium text-slate-700 leading-relaxed">Your family's safety<br/>is our priority...</p>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
+        <div class="flex justify-between items-center py-2 border-b border-slate-100">
+          <div>
+            <span class="text-xs font-bold text-slate-900 block">Strict Role Segregation</span>
+            <span class="text-[10.5px] text-slate-500">Blocks cross-role dashboard access</span>
+          </div>
+          <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Enforced</span>
+        </div>
+        <div class="flex justify-between items-center py-2 border-b border-slate-100">
+          <div>
+            <span class="text-xs font-bold text-slate-900 block">Geofence Proximity Alerts</span>
+            <span class="text-[10.5px] text-slate-500">Notifies when entering / leaving safe zones</span>
+          </div>
+          <input type="checkbox" checked class="rounded text-blue-600 w-4 h-4"/>
+        </div>
+        <div class="flex justify-between items-center py-2">
+          <div>
+            <span class="text-xs font-bold text-slate-900 block">Mutual Privacy Handshake</span>
+            <span class="text-[10.5px] text-slate-500">Both devices confirm live tracking handshake</span>
+          </div>
+          <input type="checkbox" checked class="rounded text-blue-600 w-4 h-4"/>
+        </div>
+      </div>
     </section>
 
   </main>
 
   <script>
-    function showScreen(screenId, tabBtn) {
-      document.querySelectorAll('.screen-view').forEach(s => s.classList.add('hidden'));
-      const target = document.getElementById(screenId);
-      if (target) target.classList.remove('hidden');
+    // System Role State: 'PARENT' or 'STUDENT'
+    let currentRole = 'PARENT';
 
-      if (tabBtn) {
-        document.querySelectorAll('.screen-tab').forEach(b => {
-          b.className = "screen-tab px-3 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 whitespace-nowrap transition-all";
-        });
-        tabBtn.className = "screen-tab px-3 py-1.5 rounded-xl bg-blue-600 text-white whitespace-nowrap shadow-sm transition-all";
+    function toggleActiveRole() {
+      if (currentRole === 'PARENT') {
+        currentRole = 'STUDENT';
+      } else {
+        currentRole = 'PARENT';
       }
+      updateRoleDisplay();
+    }
+
+    function updateRoleDisplay() {
+      const badge = document.getElementById('active-role-badge');
+      const switchBtn = document.getElementById('switch-role-btn');
+      const tabParent = document.getElementById('tab-parent-dash');
+      const tabStudent = document.getElementById('tab-student-dash');
+      const tabApproval = document.getElementById('tab-parent-approval');
+
+      if (currentRole === 'PARENT') {
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-blue-400"></span> Parent Session';
+        switchBtn.innerText = 'Switch to Student';
+        tabParent.innerText = 'Parent Dash';
+        tabStudent.innerText = '🔒 Student Dash';
+        tabApproval.innerText = 'Parent Approval';
+        showScreenById('screen-parent-dash');
+        setActiveTab(tabParent);
+      } else {
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Student Session';
+        switchBtn.innerText = 'Switch to Parent';
+        tabParent.innerText = '🔒 Parent Dash';
+        tabStudent.innerText = 'Student Dash';
+        tabApproval.innerText = '🔒 Parent Approval';
+        showScreenById('screen-student-dash');
+        setActiveTab(tabStudent);
+      }
+    }
+
+    // Strict Role-Based Navigation Guard
+    function tryNavigate(screenId, tabBtn, requiredRole) {
+      if (currentRole === 'STUDENT' && (screenId === 'screen-parent-dash' || screenId === 'screen-approval')) {
+        showAccessDenied('🔒 Access Denied: Students are strictly restricted from accessing the Parent Dashboard and Parental Approval controls.');
+        return;
+      }
+
+      if (currentRole === 'PARENT' && screenId === 'screen-student-dash') {
+        showAccessDenied('🔒 Access Denied: Parents monitor family journeys through the Parent Dashboard & Live Family Map. Student view is restricted.');
+        return;
+      }
+
+      showScreenById(screenId);
+      if (tabBtn) {
+        setActiveTab(tabBtn);
+      }
+    }
+
+    function setActiveTab(tabBtn) {
+      document.querySelectorAll('.screen-tab').forEach(b => {
+        b.className = "screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all";
+      });
+      tabBtn.className = "screen-tab px-3 py-1.5 rounded-xl bg-blue-600 text-white whitespace-nowrap shadow-sm transition-all";
     }
 
     function showScreenById(screenId) {
       document.querySelectorAll('.screen-view').forEach(s => s.classList.add('hidden'));
       const target = document.getElementById(screenId);
-      if (target) target.classList.remove('hidden');
-    }
-
-    function triggerFastSync() {
-      const label = document.getElementById('top-water-status-label');
-      label.innerText = 'Syncing Live Geofence...';
-      setTimeout(() => {
-        label.innerText = 'All Protections Armed';
-      }, 1500);
-    }
-
-    function toggleArrivalAlert(btn) {
-      if (btn.innerText.includes('Notify')) {
-        btn.innerText = 'Reminder Configured ✓';
-        btn.className = "w-full h-11 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all";
-      } else {
-        btn.innerText = 'Notify on Arrival';
-        btn.className = "w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all";
+      if (target) {
+        target.classList.remove('hidden');
       }
+    }
+
+    function goHome() {
+      if (currentRole === 'PARENT') {
+        showScreenById('screen-parent-dash');
+        setActiveTab(document.getElementById('tab-parent-dash'));
+      } else {
+        showScreenById('screen-student-dash');
+        setActiveTab(document.getElementById('tab-student-dash'));
+      }
+    }
+
+    function showAccessDenied(message) {
+      document.getElementById('access-denied-message').innerText = message;
+      document.getElementById('access-denied-modal').classList.remove('hidden');
+    }
+
+    function closeAccessDeniedModal() {
+      document.getElementById('access-denied-modal').classList.add('hidden');
+    }
+
+    // Top Center Branded Loading Animation (Lag-Free & Optimized)
+    let syncTimer = null;
+    function triggerFastSync() {
+      const label = document.getElementById('top-loading-status-label');
+      const radar = document.getElementById('radar-spinner');
+      const beacon = document.getElementById('idle-beacon');
+      const shimmer = document.getElementById('shimmer-bar');
+      const pill = document.getElementById('top-branded-pill');
+
+      if (syncTimer) clearTimeout(syncTimer);
+
+      radar.classList.remove('hidden');
+      beacon.classList.add('hidden');
+      shimmer.classList.remove('hidden');
+      pill.classList.add('border-cyan-400');
+      pill.classList.remove('border-sky-400/40');
+      label.innerText = 'Syncing Real-time Geofence...';
+
+      syncTimer = setTimeout(() => {
+        label.innerText = 'Mutual Telemetry Synced ✓';
+        radar.classList.add('hidden');
+        beacon.classList.remove('hidden');
+        shimmer.classList.add('hidden');
+        pill.classList.remove('border-cyan-400');
+        pill.classList.add('border-sky-400/40');
+
+        setTimeout(() => {
+          label.innerText = 'All Protections Armed';
+        }, 1800);
+      }, 950);
+    }
+
+    function approveJourney() {
+      triggerFastSync();
+      setTimeout(() => {
+        alert('Route approved! Autonomous corridor established.');
+        showScreenById('screen-map');
+      }, 1000);
+    }
+
+    function denyJourney() {
+      alert('Route request declined.');
+      goHome();
+    }
+
+    function submitJourney() {
+      triggerFastSync();
+      setTimeout(() => {
+        alert('Journey request submitted to Sarah for consent verification.');
+        goHome();
+      }, 1000);
+    }
+
+    function triggerSOSAlert() {
+      alert('🚨 EMERGENCY SOS SENT! High-priority telemetry dispatched to Sarah Sharma and authorities.');
     }
   </script>
 </body>

@@ -62,7 +62,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.ui.components.WaterWaveLoadingIndicator
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.AccentIndigo
@@ -70,6 +69,7 @@ import com.example.ui.theme.AccentOrange
 import com.example.ui.theme.AccentRose
 import com.example.ui.theme.AccentTeal
 import com.example.ui.theme.AccentViolet
+import com.example.ui.theme.darkTextFieldColors
 import com.example.ui.viewmodel.SafeSphereViewModel
 import com.example.ui.viewmodel.ScreenDestination
 
@@ -92,11 +92,6 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        WaterWaveLoadingIndicator(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Account Preferences Synced"
-        )
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -349,11 +344,6 @@ fun DemoSimulatorScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        WaterWaveLoadingIndicator(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Interactive Sandbox Mode"
-        )
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -491,11 +481,6 @@ fun SafeZonesScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        WaterWaveLoadingIndicator(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Geofence Perimeter Active"
-        )
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -580,9 +565,27 @@ fun SafeZonesScreen(
             title = { Text("Add New Safe Zone", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = zoneName, onValueChange = { zoneName = it }, label = { Text("Zone Name (e.g. Tuition)") }, singleLine = true)
-                    OutlinedTextField(value = zoneAddress, onValueChange = { zoneAddress = it }, label = { Text("Address / Area") }, singleLine = true)
-                    OutlinedTextField(value = zoneRadius, onValueChange = { zoneRadius = it }, label = { Text("Radius (meters)") }, singleLine = true)
+                    OutlinedTextField(
+                        value = zoneName,
+                        onValueChange = { zoneName = it },
+                        label = { Text("Zone Name (e.g. Tuition)", color = Color(0xFF475569)) },
+                        singleLine = true,
+                        colors = darkTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = zoneAddress,
+                        onValueChange = { zoneAddress = it },
+                        label = { Text("Address / Area", color = Color(0xFF475569)) },
+                        singleLine = true,
+                        colors = darkTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = zoneRadius,
+                        onValueChange = { zoneRadius = it },
+                        label = { Text("Radius (meters)", color = Color(0xFF475569)) },
+                        singleLine = true,
+                        colors = darkTextFieldColors()
+                    )
                 }
             },
             confirmButton = {
@@ -619,11 +622,6 @@ fun FamilyMembersScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        WaterWaveLoadingIndicator(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Family Circle Encrypted"
-        )
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)

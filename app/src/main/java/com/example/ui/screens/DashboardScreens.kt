@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Notifications
@@ -66,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.UserRole
+import com.example.ui.components.TopCenterBrandedLoadingIndicator
 import com.example.ui.components.WaterWaveLoadingIndicator
 import com.example.ui.viewmodel.SafeSphereViewModel
 import com.example.ui.viewmodel.ScreenDestination
@@ -75,76 +77,94 @@ const val ALEX_AVATAR_URL = "https://lh3.googleusercontent.com/aida-public/AB6AX
 const val MAP_PREVIEW_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuA5M71byQCisxmdNnL9pdkBu4GtwGLYvoWFy4qUF07avfES8Y39y2XZQk5XaUAeyq4x0AJ5zzr0wSyFO3OcBzWRXesEvKzdpJ6mDDZAbevhI2PEPV6FEMDmqktBJpRx0CrYvu6h5Flfbdmxow2VQyevv52m01abUrFtnIhBvieqAwh86BLIUhk4uQSgwLPa9ppXsL_dcevAIFqfPAjJQH_Kw0yXWsZyO1IR5lCw67V0hvGnT5r47Zxmig"
 
 @Composable
-fun DashboardRoleSwitcher(
+fun RoleSecurityBanner(
     activeRole: UserRole,
-    onRoleSelected: (UserRole) -> Unit,
+    onSwitchAccountRequest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isParent = activeRole == UserRole.PARENT
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(30.dp))
-            .background(Color(0xFFDEE9FC))
-            .padding(4.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (isParent) Color(0xFFEFF6FF) else Color(0xFFF0FDF4))
+            .border(
+                width = 1.dp,
+                color = if (isParent) Color(0xFFBFDBFE) else Color(0xFFBBF7D0),
+                shape = RoundedCornerShape(18.dp)
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .testTag("role_security_banner")
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            val isParent = activeRole == UserRole.PARENT
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(if (isParent) MaterialTheme.colorScheme.primary else Color.Transparent)
-                    .clickable { onRoleSelected(UserRole.PARENT) }
-                    .padding(vertical = 8.dp)
-                    .testTag("toggle_parent_dashboard"),
-                contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(if (isParent) Color(0xFF1652F0).copy(alpha = 0.12f) else Color(0xFF006B49).copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.SupervisorAccount,
-                        contentDescription = "Parent",
-                        tint = if (isParent) Color.White else Color(0xFF474552),
-                        modifier = Modifier.size(16.dp)
+                        imageVector = if (isParent) Icons.Default.VerifiedUser else Icons.Default.School,
+                        contentDescription = "Role Icon",
+                        tint = if (isParent) Color(0xFF1652F0) else Color(0xFF006B49),
+                        modifier = Modifier.size(18.dp)
                     )
+                }
+
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (isParent) "Parent Account" else "Student Account",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isParent) Color(0xFF1E3A8A) else Color(0xFF065F46)
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Role Locked",
+                            tint = if (isParent) Color(0xFF3B82F6) else Color(0xFF10B981),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                     Text(
-                        text = "Parent Dashboard",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isParent) Color.White else Color(0xFF474552)
+                        text = if (isParent) {
+                            "Student view restricted • Full guardian telemetry"
+                        } else {
+                            "Parent dashboard strictly locked • Student safe corridor"
+                        },
+                        fontSize = 10.5.sp,
+                        color = Color(0xFF474552)
                     )
                 }
             }
 
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(if (!isParent) MaterialTheme.colorScheme.primary else Color.Transparent)
-                    .clickable { onRoleSelected(UserRole.STUDENT) }
-                    .padding(vertical = 8.dp)
-                    .testTag("toggle_student_dashboard"),
-                contentAlignment = Alignment.Center
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White)
+                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                    .clickable { onSwitchAccountRequest() }
+                    .padding(horizontal = 9.dp, vertical = 6.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.School,
-                        contentDescription = "Student",
-                        tint = if (!isParent) Color.White else Color(0xFF474552),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "Student Dashboard",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (!isParent) Color.White else Color(0xFF474552)
-                    )
-                }
+                Text(
+                    text = if (isParent) "Switch to Student" else "Switch to Parent",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isParent) Color(0xFF1652F0) else Color(0xFF006B49)
+                )
             }
         }
     }
@@ -166,16 +186,17 @@ fun ParentDashboardScreen(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Water loading animation near top center
-        WaterWaveLoadingIndicator(
+        // Branded top loading animation near top center
+        TopCenterBrandedLoadingIndicator(
             modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "All Protections Armed"
+            label = "All Protections Armed",
+            onSyncClick = { viewModel.triggerDataSync() }
         )
 
-        // Interactive View Switcher Pill
-        DashboardRoleSwitcher(
+        // Role Isolation Security Banner (strictly segregated)
+        RoleSecurityBanner(
             activeRole = UserRole.PARENT,
-            onRoleSelected = { viewModel.switchDashboardRole(it) }
+            onSwitchAccountRequest = { viewModel.switchAuthenticatedAccount(UserRole.STUDENT) }
         )
 
         // Header Greeting with Avatar & Notif
@@ -796,16 +817,17 @@ fun StudentDashboardScreen(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Water loading animation near top center
-        WaterWaveLoadingIndicator(
+        // Branded top loading animation near top center
+        TopCenterBrandedLoadingIndicator(
             modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Journey Sharing Active"
+            label = "Journey Sharing Active",
+            onSyncClick = { viewModel.triggerDataSync() }
         )
 
-        // View Switcher Pill
-        DashboardRoleSwitcher(
+        // Role Isolation Security Banner (strictly segregated)
+        RoleSecurityBanner(
             activeRole = UserRole.STUDENT,
-            onRoleSelected = { viewModel.switchDashboardRole(it) }
+            onSwitchAccountRequest = { viewModel.switchAuthenticatedAccount(UserRole.PARENT) }
         )
 
         // Header Greeting with Avatar

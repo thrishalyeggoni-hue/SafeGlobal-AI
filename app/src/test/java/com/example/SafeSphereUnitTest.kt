@@ -57,4 +57,13 @@ class SafeSphereUnitTest {
         assertEquals(300, zone.radiusMeters)
         assertTrue(zone.isActive)
     }
+
+    @Test
+    fun roleSeparation_rolesAreDistinct() {
+        val parentRole = UserRole.PARENT
+        val studentRole = UserRole.STUDENT
+        assertTrue(parentRole != studentRole)
+        assertEquals("PARENT", parentRole.name)
+        assertEquals("STUDENT", studentRole.name)
+    }
 }

@@ -7,7 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,12 +16,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserRole
 import com.example.ui.components.SafeSphereBottomNavigation
+import com.example.ui.components.TopCenterBrandedLoadingIndicator
 import com.example.ui.screens.CompleteProfileScreen
 import com.example.ui.screens.ConsentScreen
 import com.example.ui.screens.CreateIdScreen
@@ -88,14 +95,15 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
     BackHandler(
         enabled = currentScreen != ScreenDestination.PARENT_DASHBOARD &&
             currentScreen != ScreenDestination.STUDENT_DASHBOARD &&
+            currentScreen != ScreenDestination.CHOOSE_ROLE &&
             currentScreen != ScreenDestination.SPLASH
     ) {
         when (currentScreen) {
             ScreenDestination.LOADING -> viewModel.navigateTo(ScreenDestination.SPLASH)
-            ScreenDestination.CONSENT -> viewModel.navigateTo(ScreenDestination.LOADING)
+            ScreenDestination.CONSENT -> viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE)
             ScreenDestination.PHONE_VERIFY -> viewModel.navigateTo(ScreenDestination.CONSENT)
             ScreenDestination.OTP_VERIFY -> viewModel.navigateTo(ScreenDestination.PHONE_VERIFY)
-            ScreenDestination.CHOOSE_ROLE -> viewModel.navigateTo(ScreenDestination.OTP_VERIFY)
+            ScreenDestination.CHOOSE_ROLE -> viewModel.navigateTo(ScreenDestination.SPLASH)
             ScreenDestination.CREATE_ID -> viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE)
             ScreenDestination.CREATE_PASSWORD -> viewModel.navigateTo(ScreenDestination.CREATE_ID)
             ScreenDestination.COMPLETE_PROFILE -> viewModel.navigateTo(ScreenDestination.CREATE_PASSWORD)
@@ -121,6 +129,49 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
 
     val isDataLoading by viewModel.isDataLoading.collectAsState()
     val loadingStatus by viewModel.loadingStatus.collectAsState()
+    val accessDeniedMessage by viewModel.accessDeniedMessage.collectAsState()
+
+    // Access Denied Security Dialog
+    if (accessDeniedMessage != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAccessDenied() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Security Alert",
+                    tint = Color(0xFFBA1A1A),
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Security Access Restricted",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = Color(0xFF121C2A)
+                )
+            },
+            text = {
+                Text(
+                    text = accessDeniedMessage ?: "",
+                    fontSize = 13.5.sp,
+                    color = Color(0xFF474552),
+                    lineHeight = 19.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.dismissAccessDenied() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Understood", fontWeight = FontWeight.Bold)
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color.White
+        )
+    }
 
     val showBottomNav = currentScreen in listOf(
         ScreenDestination.PARENT_DASHBOARD,
@@ -156,15 +207,7 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                // Interactive Preview Screen Switcher Strip (matches HTML prototype switcher)
-                if (currentScreen != ScreenDestination.SPLASH && currentScreen != ScreenDestination.LOADING) {
-                    InteractiveScreenSwitcherBar(
-                        currentScreen = currentScreen,
-                        onSelect = { viewModel.navigateTo(it) }
-                    )
-                }
-
-                // Global Top-Center Water Wave Loading Indicator during any data operation
+                // Global Top-Center Branded Loading Animation during any data operation or API call
                 if (isDataLoading) {
                     Box(
                         modifier = Modifier
@@ -172,9 +215,10 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
                             .padding(vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        com.example.ui.components.WaterWaveLoadingIndicator(
+                        TopCenterBrandedLoadingIndicator(
                             isLoading = true,
-                            label = loadingStatus
+                            label = loadingStatus,
+                            onSyncClick = { viewModel.triggerDataSync() }
                         )
                     }
                 }
@@ -189,11 +233,11 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
                         onTimeoutOrNext = { viewModel.navigateTo(ScreenDestination.LOADING) }
                     )
                     ScreenDestination.LOADING -> LoadingScreen(
-                        onLoaded = { viewModel.navigateTo(ScreenDestination.CONSENT) }
+                        onLoaded = { viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE) }
                     )
                     ScreenDestination.CONSENT -> ConsentScreen(
                         onContinue = { viewModel.navigateTo(ScreenDestination.PHONE_VERIFY) },
-                        onBack = { viewModel.navigateTo(ScreenDestination.SPLASH) }
+                        onBack = { viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE) }
                     )
                     ScreenDestination.PHONE_VERIFY -> PhoneVerificationScreen(
                         viewModel = viewModel,
@@ -272,71 +316,4 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
         }
     }
 }
-}
-
-/**
- * Top preview switcher bar allowing instant 1-tap switching between all requested screens.
- */
-@Composable
-fun InteractiveScreenSwitcherBar(
-    currentScreen: ScreenDestination,
-    onSelect: (ScreenDestination) -> Unit
-) {
-    val screenOptions = listOf(
-        Pair("Consent", ScreenDestination.CONSENT),
-        Pair("Phone", ScreenDestination.PHONE_VERIFY),
-        Pair("Verify OTP", ScreenDestination.OTP_VERIFY),
-        Pair("Choose Role", ScreenDestination.CHOOSE_ROLE),
-        Pair("Create ID", ScreenDestination.CREATE_ID),
-        Pair("Password", ScreenDestination.CREATE_PASSWORD),
-        Pair("Profile Setup", ScreenDestination.COMPLETE_PROFILE),
-        Pair("Parent Dash", ScreenDestination.PARENT_DASHBOARD),
-        Pair("Student Dash", ScreenDestination.STUDENT_DASHBOARD),
-        Pair("Family Map", ScreenDestination.FAMILY_MAP),
-        Pair("Request Journey", ScreenDestination.REQUEST_JOURNEY),
-        Pair("Parent Approval", ScreenDestination.PARENT_APPROVAL),
-        Pair("Timeline", ScreenDestination.SAFETY_TIMELINE),
-        Pair("Emergency SOS", ScreenDestination.EMERGENCY),
-        Pair("Settings", ScreenDestination.SETTINGS),
-        Pair("Simulator", ScreenDestination.DEMO_SIMULATOR),
-        Pair("Safe Zones", ScreenDestination.SAFE_ZONES),
-        Pair("Family Members", ScreenDestination.FAMILY_MEMBERS),
-        Pair("Profile", ScreenDestination.PROFILE),
-        Pair("Splash", ScreenDestination.SPLASH),
-        Pair("Loading", ScreenDestination.LOADING)
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFEFF4FF))
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        screenOptions.forEach { (title, screen) ->
-            val isSelected = currentScreen == screen
-            FilterChip(
-                selected = isSelected,
-                onClick = { onSelect(screen) },
-                label = {
-                    Text(
-                        text = title,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color(0xFF1652F0),
-                    selectedLabelColor = Color.White,
-                    containerColor = Color.White,
-                    labelColor = Color(0xFF121C2A)
-                ),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .padding(horizontal = 3.dp)
-                    .testTag("preview_tab_${screen.name.lowercase()}")
-            )
-        }
-    }
 }

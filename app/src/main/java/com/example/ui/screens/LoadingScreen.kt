@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.CircularDotsLoader
 import com.example.ui.components.SafeSphereEmblem
-import com.example.ui.components.WaterWaveLoadingIndicator
+import com.example.ui.components.TopCenterBrandedLoadingIndicator
 import kotlinx.coroutines.delay
 
 @Composable
@@ -37,7 +37,7 @@ fun LoadingScreen(
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(Unit) {
-        delay(2400)
+        delay(2200)
         onLoaded()
     }
 
@@ -48,11 +48,12 @@ fun LoadingScreen(
             .testTag("loading_screen_root")
             .clickable { onLoaded() }
     ) {
-        // Water loading animation near top center
-        WaterWaveLoadingIndicator(
+        // Branded top center loading animation
+        TopCenterBrandedLoadingIndicator(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 44.dp),
+            isLoading = true,
             label = "Connecting SafeSphere Hub"
         )
 

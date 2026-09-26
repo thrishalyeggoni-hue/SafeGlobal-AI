@@ -38,7 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.SafeSphereEmblem
-import com.example.ui.components.WaterWaveLoadingIndicator
+import com.example.ui.components.TopCenterBrandedLoadingIndicator
 import kotlinx.coroutines.delay
 
 @Composable
@@ -73,11 +73,12 @@ fun SplashScreen(
             .testTag("splash_screen_root")
             .clickable { onTimeoutOrNext() }
     ) {
-        // Water loading animation near top center
-        WaterWaveLoadingIndicator(
+        // Branded loading animation near top center
+        TopCenterBrandedLoadingIndicator(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 44.dp),
+            isLoading = true,
             label = "Initializing SafeSphere"
         )
 

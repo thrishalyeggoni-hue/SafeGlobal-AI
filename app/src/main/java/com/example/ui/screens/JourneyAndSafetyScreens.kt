@@ -82,7 +82,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.TravelMode
-import com.example.ui.components.WaterWaveLoadingIndicator
+import com.example.ui.theme.darkTextFieldColors
 import com.example.ui.viewmodel.SafeSphereViewModel
 import com.example.ui.viewmodel.ScreenDestination
 
@@ -105,11 +105,6 @@ fun RequestJourneyScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        WaterWaveLoadingIndicator(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Solo Transport Protocol Active"
-        )
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -313,11 +308,6 @@ fun ParentApprovalScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        WaterWaveLoadingIndicator(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Parent Verification Gate"
-        )
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -482,11 +472,6 @@ fun SafetyTimelineScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        WaterWaveLoadingIndicator(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Journey Audit Active"
-        )
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -604,11 +589,6 @@ fun EmergencyScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        WaterWaveLoadingIndicator(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            label = "Emergency Broadcast Armed"
-        )
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -819,8 +799,15 @@ fun EmergencyScreen(
                     OutlinedTextField(
                         value = enteredPin,
                         onValueChange = { if (it.length <= 4) enteredPin = it },
-                        placeholder = { Text("••••") },
+                        placeholder = { Text("••••", color = Color(0xFF94A3B8)) },
                         singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF0F172A),
+                            unfocusedTextColor = Color(0xFF0F172A),
+                            cursorColor = Color(0xFF1D61F2),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                     pinMessage?.let {

@@ -81,7 +81,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.ui.components.WaterWaveLoadingIndicator
 import com.example.ui.viewmodel.SafeSphereViewModel
 import com.example.ui.viewmodel.ScreenDestination
 
@@ -116,14 +115,6 @@ fun FamilyMapScreen(
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
     ) {
-        // Water loading animation near top center
-        WaterWaveLoadingIndicator(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(top = 4.dp),
-            label = "Live GPS Mutual Telemetry Active"
-        )
-
         // Subheader navigation
         Row(
             modifier = Modifier

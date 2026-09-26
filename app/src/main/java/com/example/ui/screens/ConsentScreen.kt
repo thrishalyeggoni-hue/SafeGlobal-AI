@@ -50,7 +50,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.components.WaterWaveLoadingIndicator
 
 @Composable
 fun ConsentScreen(
@@ -103,9 +102,11 @@ fun ConsentScreen(
                     )
                 }
 
-                WaterWaveLoadingIndicator(
-                    modifier = Modifier.padding(end = 8.dp),
-                    label = "Consent Check Active"
+                Text(
+                    text = "Safety Consent",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF64748B)
                 )
             }
 
