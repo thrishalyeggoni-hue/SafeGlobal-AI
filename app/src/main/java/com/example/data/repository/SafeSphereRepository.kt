@@ -21,7 +21,9 @@ class SafeSphereRepository(private val dao: SafeSphereDao) {
 
     suspend fun removeSafeZone(id: Long) = dao.deleteSafeZone(id)
 
-    suspend fun updateJourney(journey: JourneyRecord) = dao.insertJourney(journey)
+    suspend fun insertJourney(journey: JourneyRecord) = dao.insertJourney(journey)
+
+    suspend fun updateJourney(journey: JourneyRecord) = dao.updateJourney(journey)
 
     suspend fun addTimelineEvent(event: TimelineEvent) = dao.insertTimelineEvent(event)
 

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
@@ -31,6 +32,14 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.material.icons.filled.AddLink
+import androidx.compose.material.icons.filled.PinDrop
+import androidx.compose.material.icons.filled.School
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -40,6 +49,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -73,6 +83,7 @@ import com.example.ui.theme.darkTextFieldColors
 import com.example.ui.components.WaterWaveLoadingIndicator
 import com.example.ui.viewmodel.SafeSphereViewModel
 import com.example.ui.viewmodel.ScreenDestination
+import com.example.data.model.UserRole
 
 @Composable
 fun SettingsScreen(
@@ -218,22 +229,29 @@ fun SettingsScreen(
             }
         }
 
-        // Demo Simulator Shortcut
+        // Device Link Shortcut
         Button(
-            onClick = { viewModel.navigateTo(ScreenDestination.DEMO_SIMULATOR) },
+            onClick = {
+                if (isParent) viewModel.navigateTo(ScreenDestination.FAMILY_MEMBERS)
+                else viewModel.navigateTo(ScreenDestination.LINK_CODE_GENERATOR)
+            },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006398)),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .testTag("open_demo_simulator_btn")
+                .testTag("manage_family_link_btn")
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(imageVector = Icons.Default.SmartToy, contentDescription = "Demo", tint = Color.White)
-                Text(text = "Open Demo Simulator", fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                Icon(imageVector = Icons.Default.AddLink, contentDescription = "Link Devices", tint = Color.White)
+                Text(
+                    text = if (isParent) "Manage Linked Devices" else "Pair With Guardian",
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
@@ -513,58 +531,142 @@ fun SafeZonesScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                safeZones.forEach { zone ->
-                    Row(
+                if (safeZones.isEmpty()) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFFEFF4FF))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFCCE5FF)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(imageVector = Icons.Default.Fence, contentDescription = zone.name, tint = Color(0xFF006398), modifier = Modifier.size(18.dp))
-                            }
-                            Column {
-                                Text(text = zone.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
-                                Text(text = "Within ${zone.radiusMeters}m • ${zone.expectedSchedule}", fontSize = 11.5.sp, color = Color(0xFF474552))
-                            }
-                        }
-
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF6FFBBE))
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEFF4FF)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Active", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF005236))
+                            Icon(
+                                imageVector = Icons.Default.PinDrop,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Text(
+                            text = "No Safe Zones Added",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF121C2A)
+                        )
+                        Text(
+                            text = "Set up Home, School, or other trusted zones to receive geofence entry and exit alerts.",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                } else {
+                    safeZones.forEach { zone ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFFEFF4FF))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFCCE5FF)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fence,
+                                        contentDescription = zone.name,
+                                        tint = Color(0xFF006398),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    Text(
+                                        text = zone.name,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF121C2A),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "Within ${zone.radiusMeters}m • ${zone.address}",
+                                        fontSize = 11.5.sp,
+                                        color = Color(0xFF474552),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .wrapContentWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF6FFBBE))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Active",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF005236),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        Button(
-            onClick = { showAddDialog = true },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .testTag("add_safe_zone_btn")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(text = "ADD SAFE ZONE", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Button(
+                onClick = { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006B49)),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) {
+                Icon(imageVector = Icons.Default.PinDrop, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = "MARK ON MAP", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+
+            OutlinedButton(
+                onClick = { showAddDialog = true },
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .testTag("add_safe_zone_btn")
+            ) {
+                Text(text = "ADD BY TEXT", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
 
         Spacer(modifier = Modifier.height(70.dp))
@@ -622,7 +724,11 @@ fun FamilyMembersScreen(
     viewModel: SafeSphereViewModel,
     modifier: Modifier = Modifier
 ) {
-    var showInviteDialog by remember { mutableStateOf(false) }
+    val activeRole by viewModel.activeDashboardRole.collectAsState()
+    val linkedStudents by viewModel.linkedStudents.collectAsState()
+    val linkedParents by viewModel.linkedParents.collectAsState()
+    val userProfile by viewModel.firestoreProfile.collectAsState()
+    val currentUserName = userProfile?.displayName?.ifBlank { null } ?: if (activeRole == UserRole.PARENT) "Parent" else "Student"
 
     Column(
         modifier = modifier
@@ -637,7 +743,10 @@ fun FamilyMembersScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            IconButton(onClick = { viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD) }) {
+            IconButton(onClick = {
+                if (activeRole == UserRole.PARENT) viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+                else viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+            }) {
                 Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFF121C2A))
             }
             Text(text = "Family Members", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
@@ -654,7 +763,7 @@ fun FamilyMembersScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Sarah
+                // Current User
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -664,54 +773,158 @@ fun FamilyMembersScreen(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current).data(SARAH_AVATAR_URL).crossfade(true).build(),
-                            contentDescription = "Sarah",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(44.dp).clip(CircleShape)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(if (activeRole == UserRole.PARENT) Color(0xFF43359F) else Color(0xFF006398)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (activeRole == UserRole.PARENT) Icons.Default.Person else Icons.Default.School,
+                                contentDescription = null,
+                                tint = Color.White
+                            )
+                        }
                         Column {
-                            Text(text = "Sarah (Parent)", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
-                            Text(text = "Primary Guardian", fontSize = 11.5.sp, color = Color(0xFF474552))
+                            Text(text = "$currentUserName (You)", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
+                            Text(
+                                text = if (activeRole == UserRole.PARENT) "Primary Guardian" else "Student Account",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFF474552)
+                            )
                         }
                     }
-                    Icon(imageVector = Icons.Default.ChevronRight, contentDescription = "Details", tint = Color(0xFF787584))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFE4DFFF))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = if (activeRole == UserRole.PARENT) "Parent" else "Student",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF43359F)
+                        )
+                    }
                 }
 
-                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
-
-                // Alex
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current).data(ALEX_AVATAR_URL).crossfade(true).build(),
-                            contentDescription = "Alex",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(44.dp).clip(CircleShape)
-                        )
-                        Column {
-                            Text(text = "Alex (Student)", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
-                            Text(text = "10th Grade", fontSize = 11.5.sp, color = Color(0xFF474552))
+                // If Parent: show linked students
+                if (activeRole == UserRole.PARENT) {
+                    if (linkedStudents.isNotEmpty()) {
+                        linkedStudents.forEach { student ->
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF006398)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.School, contentDescription = null, tint = Color.White)
+                                    }
+                                    Column {
+                                        Text(text = "${student.studentName} (Student)", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
+                                        Text(text = "Device Paired • Encrypted Sync", fontSize = 11.5.sp, color = Color(0xFF474552))
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFCCE5FF))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text("Connected", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF004B73))
+                                }
+                            }
                         }
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
+                        Text(
+                            text = "No linked children yet. Tap LINK CHILD below to connect via 6-digit code or QR code.",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(vertical = 6.dp)
+                        )
                     }
-                    Icon(imageVector = Icons.Default.ChevronRight, contentDescription = "Details", tint = Color(0xFF787584))
+                } else {
+                    // If Student: show linked parents
+                    if (linkedParents.isNotEmpty()) {
+                        linkedParents.forEach { parent ->
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF43359F)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
+                                    }
+                                    Column {
+                                        Text(text = "${parent.parentName} (Parent)", fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
+                                        Text(text = "Emergency Contact • Linked", fontSize = 11.5.sp, color = Color(0xFF474552))
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFE4DFFF))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text("Guardian", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF43359F))
+                                }
+                            }
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
+                        Text(
+                            text = "No guardian linked yet. Tap LINK GUARDIAN below to generate your 6-digit pairing code.",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(vertical = 6.dp)
+                        )
+                    }
                 }
             }
         }
 
         Button(
-            onClick = { showInviteDialog = true },
+            onClick = {
+                if (activeRole == UserRole.PARENT) {
+                    viewModel.navigateTo(ScreenDestination.ENTER_LINK_CODE)
+                } else {
+                    viewModel.navigateTo(ScreenDestination.LINK_CODE_GENERATOR)
+                }
+            },
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             shape = RoundedCornerShape(20.dp),
             modifier = Modifier
@@ -719,28 +932,16 @@ fun FamilyMembersScreen(
                 .height(48.dp)
                 .testTag("invite_member_btn")
         ) {
-            Text(text = "INVITE MEMBER", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Icon(Icons.Default.AddLink, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (activeRole == UserRole.PARENT) "LINK CHILD" else "LINK GUARDIAN",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         Spacer(modifier = Modifier.height(70.dp))
-    }
-
-    if (showInviteDialog) {
-        AlertDialog(
-            onDismissRequest = { showInviteDialog = false },
-            title = { Text("Invite to Family Circle", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Share this pairing code with your family member:")
-                    Text("Family ID: SF-8X21P", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF006398))
-                    Text("Pairing Code: 748291", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF006B49))
-                    Text("Codes expire in 24 hours.", fontSize = 11.5.sp, color = Color(0xFF474552))
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showInviteDialog = false }) { Text("Done", fontWeight = FontWeight.Bold) }
-            }
-        )
     }
 }
 
@@ -764,6 +965,52 @@ fun ProfileScreen(
         )
 
         val isParent = viewModel.activeDashboardRole.collectAsState().value == com.example.data.model.UserRole.PARENT
+        val profile by viewModel.firestoreProfile.collectAsState()
+        var showLogoutDialog by remember { mutableStateOf(false) }
+
+        if (showLogoutDialog) {
+            AlertDialog(
+                onDismissRequest = { showLogoutDialog = false },
+                icon = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                        contentDescription = null,
+                        tint = Color(0xFFDC2626),
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                title = {
+                    Text("Log out of SafeSphere?", fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                },
+                text = {
+                    Text(
+                        "Are you sure you want to log out? Your family connections, safe zones, and safety history will remain securely saved in your account.",
+                        fontSize = 13.5.sp,
+                        color = Color(0xFF475569),
+                        lineHeight = 19.sp
+                    )
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutDialog = false }) {
+                        Text("Cancel", color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showLogoutDialog = false
+                            viewModel.logout()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Log Out", fontWeight = FontWeight.Bold)
+                    }
+                },
+                shape = RoundedCornerShape(20.dp),
+                containerColor = Color.White
+            )
+        }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -793,23 +1040,29 @@ fun ProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(if (isParent) SARAH_AVATAR_URL else ALEX_AVATAR_URL)
-                        .crossfade(true).build(),
-                    contentDescription = "Profile",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(72.dp).clip(CircleShape)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(if (isParent) Color(0xFFDBEAFE) else Color(0xFFDCFCE7)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = (profile?.displayName?.take(1)?.uppercase() ?: if (isParent) "P" else "S"),
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (isParent) Color(0xFF1D4ED8) else Color(0xFF15803D)
+                    )
+                }
 
                 Text(
-                    text = if (isParent) "Sarah (Parent)" else "Alex (Student)",
+                    text = profile?.displayName?.ifBlank { null } ?: if (isParent) "Parent Account" else "Student Account",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF121C2A)
                 )
                 Text(
-                    text = if (isParent) "Family Primary Guardian" else "10th Grade • Lincoln High",
+                    text = if (isParent) (profile?.phone?.ifBlank { null } ?: "Family Primary Guardian") else ("${profile?.gradeClass ?: "Student"} • ${profile?.phone ?: ""}"),
                     fontSize = 12.sp,
                     color = Color(0xFF474552)
                 )
@@ -827,6 +1080,8 @@ fun ProfileScreen(
                 SettingRowItem(title = "Journey History", icon = Icons.Default.ShareLocation, onClick = { viewModel.navigateTo(ScreenDestination.SAFETY_TIMELINE) })
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
                 SettingRowItem(title = "Safety Settings", icon = Icons.Default.Security, onClick = { viewModel.navigateTo(ScreenDestination.SETTINGS) })
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
+                SettingRowItem(title = "Log Out", icon = Icons.AutoMirrored.Filled.ExitToApp, onClick = { showLogoutDialog = true })
             }
         }
 

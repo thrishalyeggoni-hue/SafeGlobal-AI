@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.SafeSphereEmblem
+import com.example.ui.viewmodel.AuthSessionState
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.delay
@@ -69,11 +71,14 @@ private enum class SplashPhase {
 
 @Composable
 fun SplashScreen(
-    onTimeoutOrNext: () -> Unit,
+    sessionState: AuthSessionState = AuthSessionState.CHECKING_SESSION,
+    onSessionResolved: (AuthSessionState) -> Unit = {},
+    onTimeoutOrNext: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // ── State ──────────────────────────────────────────────────────────────
     var phase by remember { mutableStateOf(SplashPhase.GLOW_BURST) }
+    var minAnimationDone by remember { mutableStateOf(false) }
 
     // Glow burst
     val glowRadius = remember { Animatable(0f) }
@@ -178,9 +183,16 @@ fun SplashScreen(
 
         phase = SplashPhase.PARTICLES
 
-        // Auto-navigate after full sequence
-        delay(1600)
-        onTimeoutOrNext()
+        delay(800)
+        minAnimationDone = true
+    }
+
+    LaunchedEffect(minAnimationDone, sessionState) {
+        if (minAnimationDone && sessionState != AuthSessionState.CHECKING_SESSION) {
+            delay(1000)
+            android.util.Log.d("SafeSphereNav", "SplashScreen auto-resolving: sessionState=$sessionState")
+            onSessionResolved(sessionState)
+        }
     }
 
     // ── Particle seed data (stable, computed once) ─────────────────────────
@@ -365,26 +377,7 @@ fun SplashScreen(
                     .alpha(logoAlpha.value),
                 contentAlignment = Alignment.Center
             ) {
-                // Glow ring behind emblem
-                Canvas(modifier = Modifier.size(140.dp)) {
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF1D61F2).copy(alpha = 0.45f),
-                                Color(0xFF0EA5E9).copy(alpha = 0.20f),
-                                Color.Transparent
-                            ),
-                            center = Offset(cx, cy),
-                            radius = size.minDimension * 0.5f
-                        ),
-                        radius = size.minDimension * 0.5f,
-                        center = Offset(cx, cy)
-                    )
-                }
-
-                // Intro Pic with Emblem
+                // Intro Pic with Emblem - purely transparent with no glow or background
                 SafeSphereEmblem(size = 118.dp)
             }
 
@@ -455,27 +448,47 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // CTA button — cleanly positioned below the brand text
+            // Session loading indicator or Get Started
             Box(
                 modifier = Modifier
                     .alpha(ctaAlpha.value)
-                    .padding(top = ctaOffsetY.value.dp)
+                    .offset(y = ctaOffsetY.value.dp),
+                contentAlignment = Alignment.Center
             ) {
-                androidx.compose.material3.Button(
-                    onClick = onTimeoutOrNext,
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1D61F2)
-                    ),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                    modifier = Modifier.testTag("splash_continue_btn")
-                ) {
-                    Text(
-                        "Get Started",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        letterSpacing = 0.3.sp
-                    )
+                if (sessionState == AuthSessionState.CHECKING_SESSION) {
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color(0xFF38BDF8),
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            "Checking your session...",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                } else if (sessionState == AuthSessionState.NOT_AUTHENTICATED) {
+                    androidx.compose.material3.Button(
+                        onClick = { onSessionResolved(sessionState) },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1D61F2)
+                        ),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                        modifier = Modifier.testTag("splash_continue_btn")
+                    ) {
+                        Text(
+                            "Get Started",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            letterSpacing = 0.3.sp
+                        )
+                    }
                 }
             }
         }

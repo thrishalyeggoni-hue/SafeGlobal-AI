@@ -34,14 +34,14 @@ enum class RiskState {
 @Entity(tableName = "users")
 data class SafeSphereUser(
     @PrimaryKey val id: String = "user_default",
-    val phone: String = "+91 98765 43210",
-    val safeSphereId: String = "safefamily123",
-    val displayName: String = "Sarah Sharma",
+    val phone: String = "",
+    val safeSphereId: String = "",
+    val displayName: String = "User",
     val role: UserRole = UserRole.PARENT,
-    val gradeClass: String = "10th Grade",
+    val gradeClass: String = "",
     val profilePhotoUrl: String = "",
-    val familyId: String = "SF-8X21P",
-    val pairingCode: String = "748291",
+    val familyId: String = "",
+    val pairingCode: String = "",
     val themeColorHex: String = "#1652F0",
     val isPhoneVerified: Boolean = true,
     val hasAcceptedConsent: Boolean = true
@@ -54,25 +54,25 @@ data class SafeZone(
     val type: String, // "Home", "School", "Library", "Park"
     val address: String,
     val radiusMeters: Int,
-    val expectedSchedule: String,
+    val expectedSchedule: String = "24/7 Mon-Sun",
     val isActive: Boolean = true
 )
 
 @Entity(tableName = "journeys")
 data class JourneyRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val studentName: String = "Alex",
-    val origin: String = "School",
-    val destination: String = "Home",
+    val studentName: String = "Student",
+    val origin: String = "",
+    val destination: String = "",
     val travelMode: TravelMode = TravelMode.CAR,
-    val expectedArrival: String = "5:00 PM",
-    val currentEta: String = "12 min",
-    val remainingDistance: String = "2.4 km",
-    val batteryPercent: Int = 84,
-    val status: JourneyStatus = JourneyStatus.ACTIVE,
+    val expectedArrival: String = "",
+    val currentEta: String = "",
+    val remainingDistance: String = "",
+    val batteryPercent: Int = 100,
+    val status: JourneyStatus = JourneyStatus.COMPLETED,
     val riskState: RiskState = RiskState.NORMAL,
-    val startTime: String = "4:12 PM",
-    val progressPercent: Int = 64
+    val startTime: String = "",
+    val progressPercent: Int = 0
 )
 
 @Entity(tableName = "timeline_events")
@@ -91,8 +91,8 @@ data class EmergencySettings(
     @PrimaryKey val id: Int = 1,
     val normalPin: String = "4821",
     val duressPin: String = "4822",
-    val trustedContactName: String = "Dad",
-    val trustedContactPhone: String = "+91 98765 43211",
+    val trustedContactName: String = "",
+    val trustedContactPhone: String = "",
     val shakeDetectionEnabled: Boolean = true,
     val autoShareLocation: Boolean = true,
     val geofenceAlertsEnabled: Boolean = true,

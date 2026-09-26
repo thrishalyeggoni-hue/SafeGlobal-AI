@@ -173,7 +173,7 @@ fun CreateIdScreen(
                             )
                         }
                     },
-                    placeholder = { Text("e.g. alex_student", color = Color(0xFF94A3B8)) },
+                    placeholder = { Text("e.g. your_unique_id", color = Color(0xFF94A3B8)) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(

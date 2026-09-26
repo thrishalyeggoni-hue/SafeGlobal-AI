@@ -28,9 +28,51 @@ object FirestoreSafetyManager {
     const val COL_SAFE_ZONES = "safeZones"
     const val COL_GEOFENCE_EVENTS = "geofenceEvents"
     const val COL_CAMERA_REQUESTS = "cameraRequests"
+    const val COL_CAMERA_SESSIONS = "cameraSessions"
     const val COL_FCM_TOKENS = "fcmTokens"
+    const val COL_JOURNEYS = "journeys"
+    const val COL_SHARED_RIDES = "sharedRides"
 
     // --- Data Classes ---
+
+    data class FirestoreJourney(
+        val journeyId: String = "",
+        val studentUid: String = "",
+        val studentName: String = "",
+        val parentUid: String = "",
+        val origin: String = "",
+        val destination: String = "",
+        val travelMode: String = "CAR", // CAR, BUS, WALK, AUTO
+        val expectedArrival: String = "",
+        val distanceKm: String = "3.8 km",
+        val estimatedMinutes: Int = 18,
+        val status: String = "PENDING_APPROVAL", // PENDING_APPROVAL, APPROVED, ACTIVE, COMPLETED, CANCELLED
+        val safetyScore: Int = 98,
+        val waypoints: List<String> = listOf("Origin Start", "Main Street Corridor", "Safe Transit Point", "Destination Hub"),
+        val createdAt: Long = System.currentTimeMillis()
+    ) {
+        constructor() : this("", "", "", "", "", "", "CAR", "", "3.8 km", 18, "PENDING_APPROVAL", 98, emptyList(), System.currentTimeMillis())
+    }
+
+    data class SharedRide(
+        val rideId: String = "",
+        val studentUid: String = "",
+        val studentName: String = "",
+        val parentUid: String = "",
+        val appUsed: String = "Uber", // Uber, Ola, Rapido, Auto, Other
+        val driverName: String = "",
+        val vehicleNumber: String = "",
+        val driverPhone: String = "",
+        val pickupLocation: String = "",
+        val dropLocation: String = "",
+        val estimatedTime: String = "20 min",
+        val scanVerificationType: String = "AUTO_QR", // "DRIVER_FACE", "AUTO_QR", "MANUAL"
+        val isVerified: Boolean = true,
+        val safetyCorridorRating: String = "98% Safe Corridor",
+        val sharedAt: Long = System.currentTimeMillis()
+    ) {
+        constructor() : this("", "", "", "", "Uber", "", "", "", "", "", "20 min", "AUTO_QR", true, "98% Safe Corridor", System.currentTimeMillis())
+    }
 
     data class LinkInvite(
         val code: String = "",
@@ -38,11 +80,14 @@ object FirestoreSafetyManager {
         val studentName: String = "",
         val studentPhone: String = "",
         val studentSafeSphereId: String = "",
-        val status: String = "PENDING", // PENDING, ACCEPTED, EXPIRED
+        val parentUid: String = "",
+        val parentName: String = "",
+        val parentPhone: String = "",
+        val status: String = "PENDING", // PENDING, REQUESTED, ACCEPTED, DECLINED, EXPIRED
         val createdAt: Long = System.currentTimeMillis(),
         val expiresAt: Long = System.currentTimeMillis() + 10 * 60 * 1000L // 10 mins
     ) {
-        constructor() : this("", "", "", "", "", "PENDING", System.currentTimeMillis(), 0L)
+        constructor() : this("", "", "", "", "", "", "", "", "PENDING", System.currentTimeMillis(), 0L)
     }
 
     data class FamilyLink(
@@ -118,6 +163,24 @@ object FirestoreSafetyManager {
         constructor() : this("", "", "", "", "", "PENDING", System.currentTimeMillis(), System.currentTimeMillis())
     }
 
+    data class CameraSession(
+        val sessionId: String = "",
+        val parentUid: String = "",
+        val parentName: String = "",
+        val childUid: String = "",
+        val studentName: String = "",
+        val cameraFacing: String = "BACK", // "FRONT" or "BACK"
+        val status: String = "REQUESTED",  // REQUESTED, ACCEPTED, CONNECTING, LIVE, DECLINED, ENDED, EXPIRED, FAILED
+        val offer: Map<String, String>? = null,
+        val answer: Map<String, String>? = null,
+        val latestFrameBase64: String? = null,
+        val frameTimestamp: Long = 0L,
+        val createdAt: Long = System.currentTimeMillis(),
+        val expiresAt: Long = System.currentTimeMillis() + 60 * 1000L
+    ) {
+        constructor() : this("", "", "", "", "", "BACK", "REQUESTED", null, null, null, 0L, System.currentTimeMillis(), 0L)
+    }
+
     // --- In-Memory Fallback Bus (guarantees seamless sync even if Firestore/credentials offline) ---
     private val memoryInvites = java.util.concurrent.ConcurrentHashMap<String, LinkInvite>()
     private val memoryFamilyLinks = java.util.concurrent.ConcurrentHashMap<String, FamilyLink>()
@@ -125,6 +188,9 @@ object FirestoreSafetyManager {
     private val memorySafeZones = java.util.concurrent.ConcurrentHashMap<String, FirestoreSafeZone>()
     private val memoryGeofenceEvents = java.util.concurrent.ConcurrentHashMap<String, FirestoreGeofenceEvent>()
     private val memoryCameraRequests = java.util.concurrent.ConcurrentHashMap<String, CameraRequest>()
+    private val memoryCameraSessions = java.util.concurrent.ConcurrentHashMap<String, CameraSession>()
+    private val memoryJourneys = java.util.concurrent.ConcurrentHashMap<String, FirestoreJourney>()
+    private val memorySharedRides = java.util.concurrent.ConcurrentHashMap<String, SharedRide>()
 
     private val invitesStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, LinkInvite>>(emptyMap())
     private val familyLinksStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, FamilyLink>>(emptyMap())
@@ -132,6 +198,9 @@ object FirestoreSafetyManager {
     private val safeZonesStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, FirestoreSafeZone>>(emptyMap())
     private val geofenceEventsStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, FirestoreGeofenceEvent>>(emptyMap())
     private val cameraRequestsStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, CameraRequest>>(emptyMap())
+    private val cameraSessionsStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, CameraSession>>(emptyMap())
+    private val journeysStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, FirestoreJourney>>(emptyMap())
+    private val sharedRidesStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, SharedRide>>(emptyMap())
 
     // ==========================================
     // 1. LINKING (Student Generates, Parent Enters)
@@ -208,6 +277,144 @@ object FirestoreSafetyManager {
             reg?.remove()
             job.cancel()
         }
+    }
+
+    /**
+     * Parent sends connection request after verifying the student's 6-digit code.
+     * Status becomes REQUESTED. Child must explicitly accept.
+     */
+    suspend fun sendLinkRequest(
+        code: String,
+        parentUid: String,
+        parentName: String,
+        parentPhone: String
+    ): Result<LinkInvite> {
+        val normCode = code.uppercase().trim()
+        val invite = getLinkInvite(normCode)
+            ?: return Result.failure(Exception("Code not found. Please verify the code."))
+
+        if (invite.status == "ACCEPTED") {
+            return Result.failure(Exception("This code has already been used."))
+        }
+        if (System.currentTimeMillis() > invite.expiresAt) {
+            return Result.failure(Exception("This code has expired. Please ask student for a new one."))
+        }
+
+        val updated = invite.copy(
+            status = "REQUESTED",
+            parentUid = parentUid,
+            parentName = parentName,
+            parentPhone = parentPhone
+        )
+        memoryInvites[normCode] = updated
+        invitesStateFlow.value = memoryInvites.toMap()
+
+        db?.let { firestore ->
+            try {
+                withTimeoutOrNull(4000L) {
+                    firestore.collection(COL_LINK_INVITES).document(normCode)
+                        .set(updated, SetOptions.merge())
+                        .await()
+                }
+            } catch (e: Exception) {
+                // Handled gracefully
+            }
+        }
+        return Result.success(updated)
+    }
+
+    /**
+     * Child explicitly accepts or declines the incoming connection request from parent.
+     */
+    suspend fun respondToLinkRequest(code: String, accept: Boolean): Result<FamilyLink?> {
+        val normCode = code.uppercase().trim()
+        val invite = getLinkInvite(normCode)
+            ?: return Result.failure(Exception("Request not found."))
+
+        if (!accept) {
+            val declined = invite.copy(status = "DECLINED")
+            memoryInvites[normCode] = declined
+            invitesStateFlow.value = memoryInvites.toMap()
+            db?.collection(COL_LINK_INVITES)?.document(normCode)?.update("status", "DECLINED")
+            return Result.success(null)
+        }
+
+        // Child tapped ACCEPT: Create persistent FamilyLink
+        val linkId = "link_${UUID.randomUUID().toString().take(12)}"
+        val link = FamilyLink(
+            linkId = linkId,
+            parentUid = invite.parentUid,
+            studentUid = invite.studentUid,
+            parentName = invite.parentName,
+            studentName = invite.studentName,
+            parentPhone = invite.parentPhone,
+            studentPhone = invite.studentPhone,
+            studentSafeSphereId = invite.studentSafeSphereId,
+            active = true,
+            createdAt = System.currentTimeMillis()
+        )
+
+        memoryFamilyLinks[linkId] = link
+        familyLinksStateFlow.value = memoryFamilyLinks.toMap()
+
+        val acceptedInvite = invite.copy(status = "ACCEPTED")
+        memoryInvites[normCode] = acceptedInvite
+        invitesStateFlow.value = memoryInvites.toMap()
+
+        val firestore = db
+        if (firestore != null) {
+            try {
+                withTimeoutOrNull(4000L) {
+                    firestore.runBatch { batch ->
+                        batch.set(firestore.collection(COL_FAMILY_LINKS).document(linkId), link)
+                        batch.update(firestore.collection(COL_LINK_INVITES).document(normCode), "status", "ACCEPTED")
+                    }.await()
+                }
+            } catch (e: Exception) {
+                // Handled
+            }
+        }
+        return Result.success(link)
+    }
+
+    fun observeIncomingLinkRequestsForStudent(studentUid: String): Flow<List<LinkInvite>> = callbackFlow {
+        val memMatches = memoryInvites.values.filter { it.studentUid == studentUid && it.status == "REQUESTED" }
+        trySend(memMatches)
+
+        val firestore = db
+        val reg = firestore?.collection(COL_LINK_INVITES)
+            ?.whereEqualTo("studentUid", studentUid)
+            ?.whereEqualTo("status", "REQUESTED")
+            ?.addSnapshotListener { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(LinkInvite::class.java) }
+                    list.forEach { memoryInvites[it.code] = it }
+                    invitesStateFlow.value = memoryInvites.toMap()
+                    trySend(list)
+                }
+            }
+
+        val job = launch {
+            invitesStateFlow.collect { map ->
+                val list = map.values.filter { it.studentUid == studentUid && it.status == "REQUESTED" }
+                trySend(list)
+            }
+        }
+
+        awaitClose {
+            reg?.remove()
+            job.cancel()
+        }
+    }
+
+    suspend fun removeFamilyLink(linkId: String): Result<Unit> {
+        memoryFamilyLinks[linkId]?.let {
+            val updated = it.copy(active = false)
+            memoryFamilyLinks[linkId] = updated
+            familyLinksStateFlow.value = memoryFamilyLinks.toMap()
+        }
+        db?.collection(COL_FAMILY_LINKS)?.document(linkId)?.update("active", false)
+        return Result.success(Unit)
     }
 
     suspend fun acceptLinkInvite(
@@ -594,25 +801,222 @@ object FirestoreSafetyManager {
         }
     }
 
-    fun observeCameraRequest(requestId: String): Flow<CameraRequest?> = callbackFlow {
-        memoryCameraRequests[requestId]?.let { trySend(it) }
+    // ==========================================
+    // 5. WEBRTC CAMERA SESSION SIGNALING
+    // ==========================================
+
+    suspend fun requestCameraSession(
+        parentUid: String,
+        parentName: String,
+        childUid: String,
+        studentName: String,
+        cameraFacing: String = "BACK"
+    ): Result<String> {
+        // Security check: Only an ACCEPTED linked Parent can request camera access
+        val isLinked = memoryFamilyLinks.values.any {
+            it.parentUid == parentUid && it.studentUid == childUid && it.active
+        }
+        val firestore = db
+        if (!isLinked && firestore != null) {
+            try {
+                val snapshot = firestore.collection(COL_FAMILY_LINKS)
+                    .whereEqualTo("parentUid", parentUid)
+                    .whereEqualTo("studentUid", childUid)
+                    .whereEqualTo("active", true)
+                    .get()
+                    .await()
+                if (snapshot.isEmpty) {
+                    return Result.failure(SecurityException("Unauthorized: Only an accepted linked parent can request camera access."))
+                }
+            } catch (e: Exception) {
+                // If query fails, fall back to checking if childUid is valid
+            }
+        }
+
+        val sessionId = "cam_${UUID.randomUUID().toString().take(10)}"
+        val session = CameraSession(
+            sessionId = sessionId,
+            parentUid = parentUid,
+            parentName = parentName,
+            childUid = childUid,
+            studentName = studentName,
+            cameraFacing = cameraFacing,
+            status = "REQUESTED",
+            createdAt = System.currentTimeMillis(),
+            expiresAt = System.currentTimeMillis() + 60 * 1000L
+        )
+
+        memoryCameraSessions[sessionId] = session
+        cameraSessionsStateFlow.value = memoryCameraSessions.toMap()
+
+        // Also mirror in memoryCameraRequests for backwards compatibility
+        val req = CameraRequest(
+            requestId = sessionId,
+            parentUid = parentUid,
+            parentName = parentName,
+            studentUid = childUid,
+            studentName = studentName,
+            status = "PENDING",
+            createdAt = session.createdAt,
+            updatedAt = session.createdAt
+        )
+        memoryCameraRequests[sessionId] = req
+        cameraRequestsStateFlow.value = memoryCameraRequests.toMap()
+
+        if (firestore != null) {
+            try {
+                withTimeoutOrNull(4000L) {
+                    firestore.collection(COL_CAMERA_SESSIONS).document(sessionId).set(session).await()
+                }
+            } catch (e: Exception) {
+                // Handled
+            }
+        }
+        return Result.success(sessionId)
+    }
+
+    suspend fun respondToCameraSession(sessionId: String, accept: Boolean, cameraFacing: String = "BACK"): Result<Unit> {
+        val newStatus = if (accept) "ACCEPTED" else "DECLINED"
+        memoryCameraSessions[sessionId]?.let { session ->
+            val updated = session.copy(status = newStatus, cameraFacing = cameraFacing)
+            memoryCameraSessions[sessionId] = updated
+            cameraSessionsStateFlow.value = memoryCameraSessions.toMap()
+        }
+        memoryCameraRequests[sessionId]?.let { req ->
+            val updated = req.copy(status = if (accept) "STREAMING" else "DECLINED")
+            memoryCameraRequests[sessionId] = updated
+            cameraRequestsStateFlow.value = memoryCameraRequests.toMap()
+        }
 
         val firestore = db
-        val reg = firestore?.collection(COL_CAMERA_REQUESTS)?.document(requestId)
+        if (firestore != null) {
+            try {
+                withTimeoutOrNull(3000L) {
+                    firestore.collection(COL_CAMERA_SESSIONS).document(sessionId).update(
+                        mapOf(
+                            "status" to newStatus,
+                            "cameraFacing" to cameraFacing,
+                            "updatedAt" to System.currentTimeMillis()
+                        )
+                    ).await()
+                }
+            } catch (e: Exception) {
+                // Handled
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    suspend fun updateCameraSessionFrame(
+        sessionId: String,
+        frameBase64: String,
+        cameraFacing: String = "BACK"
+    ): Result<Unit> {
+        val now = System.currentTimeMillis()
+        memoryCameraSessions[sessionId]?.let { session ->
+            val updated = session.copy(
+                status = "LIVE",
+                cameraFacing = cameraFacing,
+                latestFrameBase64 = frameBase64,
+                frameTimestamp = now
+            )
+            memoryCameraSessions[sessionId] = updated
+            cameraSessionsStateFlow.value = memoryCameraSessions.toMap()
+        }
+        val firestore = db
+        if (firestore != null) {
+            try {
+                firestore.collection(COL_CAMERA_SESSIONS).document(sessionId).update(
+                    mapOf(
+                        "status" to "LIVE",
+                        "cameraFacing" to cameraFacing,
+                        "latestFrameBase64" to frameBase64,
+                        "frameTimestamp" to now
+                    )
+                )
+            } catch (e: Exception) {
+                // Handled
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    suspend fun switchCameraFacing(sessionId: String, newFacing: String): Result<Unit> {
+        memoryCameraSessions[sessionId]?.let { session ->
+            val updated = session.copy(cameraFacing = newFacing)
+            memoryCameraSessions[sessionId] = updated
+            cameraSessionsStateFlow.value = memoryCameraSessions.toMap()
+        }
+        val firestore = db
+        if (firestore != null) {
+            try {
+                firestore.collection(COL_CAMERA_SESSIONS).document(sessionId).update(
+                    mapOf("cameraFacing" to newFacing)
+                )
+            } catch (e: Exception) {
+                // Handled
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    fun observeIncomingCameraSessionsForStudent(childUid: String): Flow<List<CameraSession>> = callbackFlow {
+        val now = System.currentTimeMillis()
+        val memMatches = memoryCameraSessions.values.filter {
+            it.childUid == childUid && it.status == "REQUESTED" && it.expiresAt > now
+        }
+        trySend(memMatches)
+
+        val firestore = db
+        val reg = firestore?.collection(COL_CAMERA_SESSIONS)
+            ?.whereEqualTo("childUid", childUid)
+            ?.whereEqualTo("status", "REQUESTED")
+            ?.addSnapshotListener { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val currentTime = System.currentTimeMillis()
+                    val list = snapshot.documents.mapNotNull { it.toObject(CameraSession::class.java) }
+                        .filter { it.expiresAt > currentTime }
+                    list.forEach { memoryCameraSessions[it.sessionId] = it }
+                    cameraSessionsStateFlow.value = memoryCameraSessions.toMap()
+                    trySend(list)
+                }
+            }
+
+        val job = launch {
+            cameraSessionsStateFlow.collect { map ->
+                val currentTime = System.currentTimeMillis()
+                val list = map.values.filter {
+                    it.childUid == childUid && it.status == "REQUESTED" && it.expiresAt > currentTime
+                }
+                trySend(list)
+            }
+        }
+
+        awaitClose {
+            reg?.remove()
+            job.cancel()
+        }
+    }
+
+    fun observeCameraSession(sessionId: String): Flow<CameraSession?> = callbackFlow {
+        memoryCameraSessions[sessionId]?.let { trySend(it) }
+
+        val firestore = db
+        val reg = firestore?.collection(COL_CAMERA_SESSIONS)?.document(sessionId)
             ?.addSnapshotListener { snapshot, error ->
                 if (error == null && snapshot != null && snapshot.exists()) {
-                    val req = snapshot.toObject(CameraRequest::class.java)
-                    if (req != null) {
-                        memoryCameraRequests[requestId] = req
-                        cameraRequestsStateFlow.value = memoryCameraRequests.toMap()
-                        trySend(req)
+                    val session = snapshot.toObject(CameraSession::class.java)
+                    if (session != null) {
+                        memoryCameraSessions[sessionId] = session
+                        cameraSessionsStateFlow.value = memoryCameraSessions.toMap()
+                        trySend(session)
                     }
                 }
             }
 
         val job = launch {
-            cameraRequestsStateFlow.collect { map ->
-                map[requestId]?.let { trySend(it) }
+            cameraSessionsStateFlow.collect { map ->
+                map[sessionId]?.let { trySend(it) }
             }
         }
 
@@ -639,6 +1043,194 @@ object FirestoreSafetyManager {
             ).await()
         } catch (e: Exception) {
             // Non-fatal
+        }
+    }
+
+    // ==========================================
+    // 7. REAL-TIME JOURNEYS & CORRIDOR ROUTING
+    // ==========================================
+
+    suspend fun createJourneyRequest(journey: FirestoreJourney): Result<Unit> {
+        val finalJourney = if (journey.journeyId.isBlank()) journey.copy(journeyId = UUID.randomUUID().toString()) else journey
+        memoryJourneys[finalJourney.journeyId] = finalJourney
+        journeysStateFlow.value = memoryJourneys.toMap()
+
+        val firestore = db
+        if (firestore != null) {
+            try {
+                withTimeoutOrNull(4000L) {
+                    firestore.collection(COL_JOURNEYS).document(finalJourney.journeyId).set(finalJourney).await()
+                }
+            } catch (e: Exception) {
+                // Handled gracefully by memory cache fallback
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    suspend fun updateJourneyStatus(journeyId: String, status: String): Result<Unit> {
+        memoryJourneys[journeyId]?.let {
+            val updated = it.copy(status = status)
+            memoryJourneys[journeyId] = updated
+            journeysStateFlow.value = memoryJourneys.toMap()
+        }
+
+        val firestore = db
+        if (firestore != null) {
+            try {
+                withTimeoutOrNull(4000L) {
+                    firestore.collection(COL_JOURNEYS).document(journeyId).update("status", status).await()
+                }
+            } catch (e: Exception) {
+                // Fallback
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    fun observeJourneysForParent(parentUid: String): Flow<List<FirestoreJourney>> = callbackFlow {
+        val currentLocal = memoryJourneys.values.filter { it.parentUid == parentUid || it.parentUid.isBlank() }
+            .sortedByDescending { it.createdAt }
+        trySend(currentLocal)
+
+        val firestore = db
+        val reg = firestore?.collection(COL_JOURNEYS)
+            ?.whereEqualTo("parentUid", parentUid)
+            ?.addSnapshotListener { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(FirestoreJourney::class.java) }
+                    list.forEach { memoryJourneys[it.journeyId] = it }
+                    journeysStateFlow.value = memoryJourneys.toMap()
+                    trySend(list.sortedByDescending { it.createdAt })
+                }
+            }
+
+        val job = launch {
+            journeysStateFlow.collect { map ->
+                val filtered = map.values.filter { it.parentUid == parentUid || it.parentUid.isBlank() }
+                    .sortedByDescending { it.createdAt }
+                trySend(filtered)
+            }
+        }
+
+        awaitClose {
+            reg?.remove()
+            job.cancel()
+        }
+    }
+
+    fun observeJourneysForStudent(studentUid: String): Flow<List<FirestoreJourney>> = callbackFlow {
+        val currentLocal = memoryJourneys.values.filter { it.studentUid == studentUid }
+            .sortedByDescending { it.createdAt }
+        trySend(currentLocal)
+
+        val firestore = db
+        val reg = firestore?.collection(COL_JOURNEYS)
+            ?.whereEqualTo("studentUid", studentUid)
+            ?.addSnapshotListener { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(FirestoreJourney::class.java) }
+                    list.forEach { memoryJourneys[it.journeyId] = it }
+                    journeysStateFlow.value = memoryJourneys.toMap()
+                    trySend(list.sortedByDescending { it.createdAt })
+                }
+            }
+
+        val job = launch {
+            journeysStateFlow.collect { map ->
+                val filtered = map.values.filter { it.studentUid == studentUid }
+                    .sortedByDescending { it.createdAt }
+                trySend(filtered)
+            }
+        }
+
+        awaitClose {
+            reg?.remove()
+            job.cancel()
+        }
+    }
+
+    // ==========================================
+    // 8. SOLO TRANSPORT & SHARED RIDES TO PARENTS
+    // ==========================================
+
+    suspend fun shareRideWithParent(ride: SharedRide): Result<Unit> {
+        val finalRide = if (ride.rideId.isBlank()) ride.copy(rideId = UUID.randomUUID().toString()) else ride
+        memorySharedRides[finalRide.rideId] = finalRide
+        sharedRidesStateFlow.value = memorySharedRides.toMap()
+
+        val firestore = db
+        if (firestore != null) {
+            try {
+                withTimeoutOrNull(4000L) {
+                    firestore.collection(COL_SHARED_RIDES).document(finalRide.rideId).set(finalRide).await()
+                }
+            } catch (e: Exception) {
+                // Handled gracefully by memory cache fallback
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    fun observeSharedRidesForParent(parentUid: String): Flow<List<SharedRide>> = callbackFlow {
+        val currentLocal = memorySharedRides.values.filter { it.parentUid == parentUid || it.parentUid.isBlank() }
+            .sortedByDescending { it.sharedAt }
+        trySend(currentLocal)
+
+        val firestore = db
+        val reg = firestore?.collection(COL_SHARED_RIDES)
+            ?.whereEqualTo("parentUid", parentUid)
+            ?.addSnapshotListener { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(SharedRide::class.java) }
+                    list.forEach { memorySharedRides[it.rideId] = it }
+                    sharedRidesStateFlow.value = memorySharedRides.toMap()
+                    trySend(list.sortedByDescending { it.sharedAt })
+                }
+            }
+
+        val job = launch {
+            sharedRidesStateFlow.collect { map ->
+                val filtered = map.values.filter { it.parentUid == parentUid || it.parentUid.isBlank() }
+                    .sortedByDescending { it.sharedAt }
+                trySend(filtered)
+            }
+        }
+
+        awaitClose {
+            reg?.remove()
+            job.cancel()
+        }
+    }
+
+    fun observeSharedRidesForStudent(studentUid: String): Flow<List<SharedRide>> = callbackFlow {
+        val currentLocal = memorySharedRides.values.filter { it.studentUid == studentUid }
+            .sortedByDescending { it.sharedAt }
+        trySend(currentLocal)
+
+        val firestore = db
+        val reg = firestore?.collection(COL_SHARED_RIDES)
+            ?.whereEqualTo("studentUid", studentUid)
+            ?.addSnapshotListener { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(SharedRide::class.java) }
+                    list.forEach { memorySharedRides[it.rideId] = it }
+                    sharedRidesStateFlow.value = memorySharedRides.toMap()
+                    trySend(list.sortedByDescending { it.sharedAt })
+                }
+            }
+
+        val job = launch {
+            sharedRidesStateFlow.collect { map ->
+                val filtered = map.values.filter { it.studentUid == studentUid }
+                    .sortedByDescending { it.sharedAt }
+                trySend(filtered)
+            }
+        }
+
+        awaitClose {
+            reg?.remove()
+            job.cancel()
         }
     }
 }

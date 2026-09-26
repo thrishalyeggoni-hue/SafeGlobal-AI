@@ -125,7 +125,7 @@ object FirestoreUserManager {
                             "updatedAt" to System.currentTimeMillis()
                         ),
                         SetOptions.merge()
-                    )
+                    ).await()
             } catch (e: Exception) {
                 // Non-fatal
             }

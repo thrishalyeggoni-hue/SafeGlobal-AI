@@ -1,7 +1,12 @@
 package com.example.ui.screens
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.util.Base64
 import android.view.ViewGroup
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -11,6 +16,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FlipCameraAndroid
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
@@ -49,7 +56,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,6 +67,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -69,9 +80,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.ui.viewmodel.SafeSphereViewModel
 import com.example.ui.viewmodel.ScreenDestination
 import kotlinx.coroutines.delay
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.Executors
 
 // ══════════════════════════════════════════════════════════════════════
-// 1. STUDENT CAMERA SHARE SCREEN (CameraX Preview + LIVE Badge)
+// 1. STUDENT CAMERA SHARE SCREEN (CameraX Preview + Live Frame Analyzer)
 // ══════════════════════════════════════════════════════════════════════
 @Composable
 fun CameraShareScreen(
@@ -80,11 +93,42 @@ fun CameraShareScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val request = viewModel.incomingCameraRequestForStudent.collectAsState().value
-        ?: viewModel.activeCameraRequest.collectAsState().value
+    val activeSession by viewModel.activeCameraSession.collectAsState()
+    val sessionId = activeSession?.sessionId.orEmpty()
 
-    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
+    var lensFacing by remember {
+        mutableIntStateOf(
+            if (activeSession?.cameraFacing?.uppercase() == "FRONT") CameraSelector.LENS_FACING_FRONT
+            else CameraSelector.LENS_FACING_BACK
+        )
+    }
     var sessionDurationSeconds by remember { mutableIntStateOf(0) }
+    var framesStreamedCount by remember { mutableIntStateOf(0) }
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    // Sync remote lens flip requests from parent
+    LaunchedEffect(activeSession?.cameraFacing) {
+        val remoteFacing = activeSession?.cameraFacing?.uppercase()
+        if (remoteFacing == "FRONT" && lensFacing != CameraSelector.LENS_FACING_FRONT) {
+            lensFacing = CameraSelector.LENS_FACING_FRONT
+        } else if (remoteFacing == "BACK" && lensFacing != CameraSelector.LENS_FACING_BACK) {
+            lensFacing = CameraSelector.LENS_FACING_BACK
+        }
+    }
+
+    // Timer
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            sessionDurationSeconds++
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraExecutor.shutdown()
+        }
+    }
 
     val infinite = rememberInfiniteTransition(label = "live_pulse")
     val pulseAlpha by infinite.animateFloat(
@@ -97,22 +141,16 @@ fun CameraShareScreen(
         label = "pulse_alpha"
     )
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000)
-            sessionDurationSeconds++
-        }
-    }
-
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // CameraX Live Preview View
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
+        // CameraX Live Preview + Frame Analyzer
+        key(lensFacing) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
                 val previewView = PreviewView(ctx).apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -127,6 +165,50 @@ fun CameraShareScreen(
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
 
+                    var lastTransmittedTime = 0L
+
+                    // Realtime image analyzer to encode camera frames and stream to parent
+                    val imageAnalysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                        .build()
+
+                    imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                        val now = System.currentTimeMillis()
+                        // Throttle frame streaming to ~5-8 fps (every 160ms) to ensure low latency and smooth delivery
+                        if (now - lastTransmittedTime >= 160L && sessionId.isNotBlank()) {
+                            try {
+                                val bitmap = imageProxy.toBitmap()
+                                val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+
+                                // Rotate bitmap if required
+                                val finalBitmap = if (rotationDegrees != 0) {
+                                    val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+                                    Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                                } else {
+                                    bitmap
+                                }
+
+                                // Downscale to 360x480 for fast lightweight transmission
+                                val targetWidth = 360
+                                val targetHeight = (360f * finalBitmap.height / finalBitmap.width).toInt().coerceAtLeast(240)
+                                val scaledBitmap = Bitmap.createScaledBitmap(finalBitmap, targetWidth, targetHeight, true)
+
+                                val stream = ByteArrayOutputStream()
+                                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 55, stream)
+                                val base64 = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+
+                                val facingStr = if (lensFacing == CameraSelector.LENS_FACING_FRONT) "FRONT" else "BACK"
+                                viewModel.updateCameraFrame(sessionId, base64, facingStr)
+                                lastTransmittedTime = now
+                                framesStreamedCount++
+                            } catch (e: Exception) {
+                                // Ignore transient capture errors
+                            }
+                        }
+                        imageProxy.close()
+                    }
+
                     val cameraSelector = CameraSelector.Builder()
                         .requireLensFacing(lensFacing)
                         .build()
@@ -136,18 +218,24 @@ fun CameraShareScreen(
                         cameraProvider.bindToLifecycle(
                             lifecycleOwner,
                             cameraSelector,
-                            preview
+                            preview,
+                            imageAnalysis
                         )
                     } catch (e: Exception) {
-                        // Fallback
+                        // Fallback: bind preview only if analyzer fails
+                        try {
+                            cameraProvider.unbindAll()
+                            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
+                        } catch (_: Exception) {}
                     }
                 }, ContextCompat.getMainExecutor(ctx))
 
                 previewView
             }
         )
+        }
 
-        // Top Status Overlay: LIVE Badge + Timer
+        // Top Status Overlay: LIVE Badge + Timer + Flip Button
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -163,7 +251,7 @@ fun CameraShareScreen(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.65f))
+                        .background(Color.Black.copy(alpha = 0.70f))
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Row(
@@ -180,7 +268,7 @@ fun CameraShareScreen(
                         val mins = sessionDurationSeconds / 60
                         val secs = sessionDurationSeconds % 60
                         Text(
-                            text = "LIVE SHARING • ${String.format("%02d:%02d", mins, secs)}",
+                            text = "LIVE TO PARENT • ${String.format("%02d:%02d", mins, secs)}",
                             color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
@@ -188,19 +276,24 @@ fun CameraShareScreen(
                     }
                 }
 
-                // Camera Flip Button
+                // Camera Flip Button (Front / Back)
                 IconButton(
                     onClick = {
-                        lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        val newFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
                             CameraSelector.LENS_FACING_FRONT
                         } else {
                             CameraSelector.LENS_FACING_BACK
+                        }
+                        lensFacing = newFacing
+                        val facingStr = if (newFacing == CameraSelector.LENS_FACING_FRONT) "FRONT" else "BACK"
+                        if (sessionId.isNotBlank()) {
+                            viewModel.switchCameraFacing(sessionId, facingStr)
                         }
                     },
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.65f))
+                        .background(Color.Black.copy(alpha = 0.70f))
                 ) {
                     Icon(
                         imageVector = Icons.Default.Cameraswitch,
@@ -212,15 +305,16 @@ fun CameraShareScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Notice Banner
+            // Notice Banner indicating active lens
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.60f))
+                    .background(Color.Black.copy(alpha = 0.65f))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
+                val currentLensText = if (lensFacing == CameraSelector.LENS_FACING_FRONT) "Front Camera (Selfie/Face)" else "Back Camera (Surroundings)"
                 Text(
-                    text = "🔒 Surroundings check requested by ${request?.parentName ?: "Parent"}. You retain full control.",
+                    text = "🔒 $currentLensText sharing with ${activeSession?.parentName ?: "Parent"}. You retain full privacy control.",
                     color = Color(0xFFE2E8F0),
                     fontSize = 11.sp
                 )
@@ -237,8 +331,11 @@ fun CameraShareScreen(
         ) {
             Button(
                 onClick = {
-                    val reqId = request?.requestId ?: ""
-                    viewModel.endCameraSession(reqId)
+                    if (sessionId.isNotBlank()) {
+                        viewModel.endCameraSession(sessionId)
+                    } else {
+                        viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
                 shape = RoundedCornerShape(18.dp),
@@ -255,203 +352,302 @@ fun CameraShareScreen(
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// 2. PARENT CAMERA VIEW SCREEN (Real-time Signaling)
+// 2. PARENT CAMERA VIEW SCREEN (Live Real-time Camera Feed from Student)
 // ══════════════════════════════════════════════════════════════════════
 @Composable
 fun CameraViewScreen(
     viewModel: SafeSphereViewModel,
     modifier: Modifier = Modifier
 ) {
-    val cameraRequest by viewModel.activeCameraRequest.collectAsState()
+    val activeSession by viewModel.activeCameraSession.collectAsState()
     val student = viewModel.selectedStudent.collectAsState().value
 
-    val status = cameraRequest?.status ?: "PENDING"
-    val isStreaming = status == "STREAMING"
+    val status = activeSession?.status ?: "PENDING"
+    val isStreaming = status == "LIVE" || status == "ACCEPTED" || activeSession?.latestFrameBase64 != null
     val isEnded = status == "ENDED" || status == "DECLINED"
+    val cameraFacing = activeSession?.cameraFacing?.uppercase() ?: "BACK"
+    val sessionId = activeSession?.sessionId.orEmpty()
 
     val infinite = rememberInfiniteTransition(label = "pulse_live")
     val pulseAlpha by infinite.animateFloat(
-        initialValue = 0.4f,
+        initialValue = 0.35f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = LinearEasing),
+            animation = tween(750, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_live_alpha"
     )
 
-    Column(
+    // Decode live base64 frame from child
+    val liveBitmap = remember(activeSession?.latestFrameBase64) {
+        val base64Str = activeSession?.latestFrameBase64
+        if (base64Str.isNullOrBlank()) {
+            null
+        } else {
+            try {
+                val bytes = Base64.decode(base64Str, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0F172A))
-            .statusBarsPadding()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color(0xFF0B1120))
     ) {
-        // Top Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { viewModel.navigateTo(ScreenDestination.STUDENT_CONTROL_CENTER) }) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-            }
-            Text(
-                text = "Live Camera Telemetry",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Main Status Viewport Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-            Box(
+        // Main Viewport: Live Image Stream or Placeholder State
+        if (isStreaming && liveBitmap != null) {
+            // Render Child's Live Camera Feed in Full Screen
+            Image(
+                bitmap = liveBitmap,
+                contentDescription = "Child Live Camera Feed",
                 modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            // Loading / Waiting / Ended card centered
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                when {
-                    isStreaming -> {
-                        // Streaming active state
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFDC2626).copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        when {
+                            isEnded -> {
                                 Icon(
-                                    imageVector = Icons.Default.Videocam,
+                                    imageVector = Icons.Default.VideocamOff,
                                     contentDescription = null,
-                                    tint = Color(0xFFEF4444),
-                                    modifier = Modifier.size(36.dp)
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier.size(54.dp)
                                 )
-                            }
-
-                            Spacer(modifier = Modifier.height(20.dp))
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFEF4444))
-                                        .alpha(pulseAlpha)
-                                )
+                                Spacer(modifier = Modifier.height(14.dp))
                                 Text(
-                                    text = "LIVE CONNECTION ACTIVE",
-                                    color = Color(0xFFEF4444),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = 1.sp
+                                    text = if (status == "DECLINED") "Request Declined by Student" else "Camera Session Ended",
+                                    color = Color.White,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "The camera stream has ended. You can request access again anytime.",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
                                 )
                             }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Text(
-                                text = "${student?.studentName ?: "Student"} accepted camera request.",
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Text(
-                                text = "Surroundings telemetry session established over secure Firestore signaling channel.",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
-                    }
-                    isEnded -> {
-                        // Ended or declined
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.VideocamOff, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(54.dp))
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Text(
-                                text = if (status == "DECLINED") "Request Declined by Student" else "Camera Session Ended",
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    else -> {
-                        // Pending student acceptance
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                color = Color(0xFF3B82F6),
-                                modifier = Modifier.size(48.dp),
-                                strokeWidth = 3.5.dp
-                            )
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Text(
-                                text = "Request Sent to ${student?.studentName ?: "Student"}",
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Waiting for student to consent and open camera preview on their device...",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center
-                            )
+                            isStreaming -> {
+                                CircularProgressIndicator(
+                                    color = Color(0xFFEF4444),
+                                    modifier = Modifier.size(44.dp),
+                                    strokeWidth = 3.dp
+                                )
+                                Spacer(modifier = Modifier.height(18.dp))
+                                Text(
+                                    text = "Connecting Live Video Feed...",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "${student?.studentName ?: "Student"} accepted! Synchronizing encrypted frames...",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            else -> {
+                                CircularProgressIndicator(
+                                    color = Color(0xFF3B82F6),
+                                    modifier = Modifier.size(48.dp),
+                                    strokeWidth = 3.5.dp
+                                )
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Text(
+                                    text = "Request Sent to ${student?.studentName ?: "Student"}",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "A consent prompt was delivered to the student's phone. Stream will begin once accepted.",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.5.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Button(
-            onClick = {
-                val reqId = cameraRequest?.requestId ?: ""
-                if (reqId.isNotBlank()) {
-                    viewModel.endCameraSession(reqId)
-                } else {
-                    viewModel.navigateTo(ScreenDestination.STUDENT_CONTROL_CENTER)
-                }
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
-            shape = RoundedCornerShape(16.dp),
+        // Top Floating Control Bar
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
-            Text("Close Camera View", color = Color.White, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Back Button
+                IconButton(
+                    onClick = {
+                        if (sessionId.isNotBlank()) viewModel.endCameraSession(sessionId)
+                        else viewModel.navigateTo(ScreenDestination.STUDENT_CONTROL_CENTER)
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.65f))
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White
+                    )
+                }
+
+                // Live indicator badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.70f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (liveBitmap != null) Color(0xFFEF4444) else Color(0xFFF59E0B))
+                                .alpha(pulseAlpha)
+                        )
+                        Text(
+                            text = if (liveBitmap != null) "LIVE • ${student?.studentName ?: "STUDENT"}" else "CONNECTING...",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Flip Remote Camera Lens Button
+                if (isStreaming) {
+                    IconButton(
+                        onClick = {
+                            val nextFacing = if (cameraFacing == "FRONT") "BACK" else "FRONT"
+                            viewModel.switchCameraFacing(sessionId, nextFacing)
+                        },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.65f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FlipCameraAndroid,
+                            contentDescription = "Flip Remote Lens",
+                            tint = Color.White
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.size(40.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Lens and Telemetry Chip
+            if (isStreaming) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.60f))
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Videocam,
+                            contentDescription = null,
+                            tint = Color(0xFF38BDF8),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Lens: ${if (cameraFacing == "FRONT") "Front Camera (Face)" else "Back Camera (Surroundings)"}",
+                            color = Color(0xFFE2E8F0),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+
+        // Bottom Controls: Disconnect Button
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(20.dp)
+        ) {
+            Button(
+                onClick = {
+                    if (sessionId.isNotBlank()) {
+                        viewModel.endCameraSession(sessionId)
+                    } else {
+                        viewModel.navigateTo(ScreenDestination.STUDENT_CONTROL_CENTER)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (liveBitmap != null) Color(0xFFDC2626) else Color(0xFF334155)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Icon(
+                    imageVector = if (liveBitmap != null) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    tint = Color.White
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (liveBitmap != null) "Disconnect Live Stream" else "Return to Control Center",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+            }
         }
     }
 }

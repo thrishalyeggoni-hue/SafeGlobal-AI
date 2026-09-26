@@ -10,15 +10,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 
-const val SAFESPHERE_LOGO_URL =
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuD9AoEQSy3MyN3v8pE1-hWTuBx2ASiNB2gkxPpwtTTMUSGlmnk5wYhFTrs-kv6aUkZcggjoqJLGK4g9dTJs3vG0M43AN6g-_5ZhqMvBVXD9BDbXpucS1hK0Bx9TBoPnUekvb9KoMytUwvIeA0ahO7zwJzX_fiq-4QKJnD_jLp7XClcjam1D9WA1T933HK-9kRz1USBBVt-aRXt43FsKpCOgRKKG5lIMYUxhaq-sR02fBAhZ8jOtfV7x9FuuJlDrQ8YJUJA"
 
 @Composable
 fun SafeSphereEmblem(
@@ -116,15 +110,7 @@ fun SafeSphereEmblem(
             )
         }
 
-        // Hotlinked Async image for pixel-perfect identity from HTML
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(SAFESPHERE_LOGO_URL)
-                .crossfade(true)
-                .build(),
-            contentDescription = "SafeSphere Emblem",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.size(size)
-        )
+        // Canvas-drawn vector logo is transparent — no background box.
+        // (The remote AsyncImage was removed because its PNG had a white square background.)
     }
 }

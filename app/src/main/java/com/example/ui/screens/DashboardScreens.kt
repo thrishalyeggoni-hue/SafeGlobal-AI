@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,12 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShareLocation
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.AddLink
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.filled.SupervisorAccount
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -45,8 +52,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LocalTaxi
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Videocam
+import com.example.data.repository.FirestoreSafetyManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -239,6 +248,9 @@ fun ParentDashboardScreen(
                             .clip(CircleShape)
                     )
 
+                    val firestoreProfile by viewModel.firestoreProfile.collectAsState()
+                    val parentDisplayName = firestoreProfile?.displayName.orEmpty().ifBlank { "Parent" }
+
                     Column {
                         Text(
                             text = "SAFESPHERE FAMILY",
@@ -248,7 +260,7 @@ fun ParentDashboardScreen(
                             letterSpacing = 0.5.sp
                         )
                         Text(
-                            text = "Good Morning, Sarah",
+                            text = "Good Morning, $parentDisplayName",
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF121C2A)
@@ -288,6 +300,8 @@ fun ParentDashboardScreen(
         }
 
         val linkedStudents by viewModel.linkedStudents.collectAsState()
+        val incomingJourneys by viewModel.incomingJourneysForParent.collectAsState()
+        val incomingSharedRides by viewModel.incomingSharedRidesForParent.collectAsState()
 
         // Real Connected Students Section (Two-Phone Family Safety)
         if (linkedStudents.isEmpty()) {
@@ -435,10 +449,325 @@ fun ParentDashboardScreen(
             }
         }
 
+        // =====================================================================
+        // INCOMING JOURNEYS FOR PARENT (Real-time Permission & Route Display)
+        // =====================================================================
+        if (incomingJourneys.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "JOURNEY PERMISSION REQUESTS (${incomingJourneys.size})",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                incomingJourneys.forEach { journey ->
+                    val isPending = journey.status == "PENDING"
+                    val isApproved = journey.status == "APPROVED"
+
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isPending) Color(0xFFFFFBEB) else Color.White
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.5.dp,
+                            if (isPending) Color(0xFFF59E0B) else Color(0xFF10B981)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isPending) Color(0xFFFEF3C7) else Color(0xFFDCFCE7)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DirectionsCar,
+                                            contentDescription = null,
+                                            tint = if (isPending) Color(0xFFD97706) else Color(0xFF16A34A),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "${journey.studentName.ifBlank { "Student" }}'s Journey Request",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = Color(0xFF1E293B)
+                                        )
+                                        Text(
+                                            text = "Mode: ${journey.travelMode} • ETA: ${journey.expectedArrival.ifBlank { "20 min" }}",
+                                            fontSize = 12.sp,
+                                            color = Color(0xFF64748B)
+                                        )
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (isPending) Color(0xFFF59E0B) else Color(0xFF16A34A)
+                                        )
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = journey.status,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            // Origin to Destination Route Preview
+                            PredictedRouteCard(
+                                origin = journey.origin.ifBlank { "University Campus" },
+                                destination = journey.destination.ifBlank { "Home" },
+                                distanceKm = "4.2 km",
+                                duration = journey.expectedArrival.ifBlank { "20 min" },
+                                safetyScore = 98,
+                                travelMode = journey.travelMode
+                            )
+
+                            // Actions if Pending
+                            if (isPending) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Button(
+                                        onClick = { viewModel.denyJourney(journey.journeyId) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFFF1F5F9)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Deny", color = Color(0xFF475569), fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Button(
+                                        onClick = { viewModel.approveJourney(journey.journeyId) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF16A34A)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(2f)
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Approve Journey", color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            } else if (isApproved) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp))
+                                    Text(
+                                        text = "Approved by you • Real-time AI Corridor Monitored",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF15803D),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // LIVE SHARED SOLO TRANSPORT RIDES (With Auto QR / Face Verification)
+        // =====================================================================
+        if (incomingSharedRides.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "LIVE SOLO TRANSPORT RIDES (${incomingSharedRides.size})",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF64748B),
+                    letterSpacing = 1.sp
+                )
+
+                incomingSharedRides.forEach { ride ->
+                    val context = LocalContext.current
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF2563EB)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFEFF6FF)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.LocalTaxi,
+                                            contentDescription = null,
+                                            tint = Color(0xFF2563EB),
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "${ride.studentName.ifBlank { "Student" }}'s Solo Transit",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Text(
+                                            text = "${ride.appUsed} • ${ride.vehicleNumber}",
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF2563EB)
+                                        )
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFDCFCE7))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = if (ride.scanVerificationType == "AUTO_QR") "✓ Auto QR"
+                                        else if (ride.scanVerificationType == "DRIVER_FACE") "✓ Face Scan"
+                                        else "✓ Verified",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF16A34A)
+                                    )
+                                }
+                            }
+
+                            // Driver info details pill
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color.White)
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "Driver: ${ride.driverName.ifBlank { "Verified Driver" }}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF1E293B)
+                                        )
+                                        if (ride.driverPhone.isNotBlank()) {
+                                            Text(
+                                                text = "Mobile: ${ride.driverPhone}",
+                                                fontSize = 12.sp,
+                                                color = Color(0xFF64748B)
+                                            )
+                                        }
+                                    }
+
+                                    if (ride.driverPhone.isNotBlank()) {
+                                        Button(
+                                            onClick = {
+                                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${ride.driverPhone}"))
+                                                context.startActivity(intent)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A)),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                                horizontal = 10.dp,
+                                                vertical = 6.dp
+                                            )
+                                        ) {
+                                            Icon(Icons.Default.Phone, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Call Driver", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Predicted Route Card
+                            PredictedRouteCard(
+                                origin = ride.pickupLocation.ifBlank { "Pickup Point" },
+                                destination = ride.dropLocation.ifBlank { "Destination" },
+                                distanceKm = "5.2 km",
+                                duration = ride.estimatedTime.ifBlank { "22 min" },
+                                safetyScore = 99,
+                                travelMode = ride.appUsed
+                            )
+
+                            // Track On Map Button
+                            Button(
+                                onClick = { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Map, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Track Live on Family Map", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Green Safe Status Banner
         Card(
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF6FFBBE)),
+            colors = CardDefaults.cardColors(containerColor = if (linkedStudents.isNotEmpty()) Color(0xFF6FFBBE) else Color(0xFFEFF4FF)),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Row(
@@ -450,34 +779,36 @@ fun ParentDashboardScreen(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF005236).copy(alpha = 0.15f)),
+                            .background(if (linkedStudents.isNotEmpty()) Color(0xFF005236).copy(alpha = 0.15f) else Color(0xFFCCE5FF)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.VerifiedUser,
-                            contentDescription = "Verified",
-                            tint = Color(0xFF002113),
+                            imageVector = if (linkedStudents.isNotEmpty()) Icons.Default.VerifiedUser else Icons.Default.AddLink,
+                            contentDescription = "Status",
+                            tint = if (linkedStudents.isNotEmpty()) Color(0xFF002113) else Color(0xFF006398),
                             modifier = Modifier.size(24.dp)
                         )
                     }
 
                     Column {
                         Text(
-                            text = "Your family is safe",
+                            text = if (linkedStudents.isNotEmpty()) "Your family is protected" else "Setup Family Linkage",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF002113)
+                            color = if (linkedStudents.isNotEmpty()) Color(0xFF002113) else Color(0xFF1E293B)
                         )
                         Text(
-                            text = "2 active devices • Geofence check intact",
+                            text = if (linkedStudents.isNotEmpty()) "${linkedStudents.size} active device${if (linkedStudents.size > 1) "s" else ""} • Geofence check intact"
+                                   else "No child linked • Link student device to monitor",
                             fontSize = 11.5.sp,
-                            color = Color(0xFF005236)
+                            color = if (linkedStudents.isNotEmpty()) Color(0xFF005236) else Color(0xFF64748B)
                         )
                     }
                 }
@@ -485,14 +816,14 @@ fun ParentDashboardScreen(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF006B49))
+                        .background(if (linkedStudents.isNotEmpty()) Color(0xFF006B49) else Color(0xFFCBD5E1))
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "Active",
+                        text = if (linkedStudents.isNotEmpty()) "Active" else "Standby",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = if (linkedStudents.isNotEmpty()) Color.White else Color(0xFF334155)
                     )
                 }
             }
@@ -540,102 +871,10 @@ fun ParentDashboardScreen(
                     }
                 }
 
-                // Member 1: Alex (Student)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFEFF4FF))
-                        .clickable { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) }
-                        .padding(12.dp)
-                        .testTag("member_card_alex")
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(modifier = Modifier.size(44.dp)) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(ALEX_AVATAR_URL)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = "Alex",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF10B981))
-                                        .border(1.5.dp, Color.White, CircleShape)
-                                )
-                            }
+                // Member 1: You (Parent)
+                val currentParentProfile by viewModel.firestoreProfile.collectAsState()
+                val parentDisplayName = currentParentProfile?.displayName?.ifBlank { null } ?: "You"
 
-                            Column {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = "Alex",
-                                        fontSize = 14.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF121C2A)
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFFCCE5FF))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "Student",
-                                            fontSize = 10.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF004B73)
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.NearMe,
-                                        contentDescription = "On trip",
-                                        tint = Color(0xFF006398),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = "On trip • 2h 15m remaining",
-                                        fontSize = 11.5.sp,
-                                        color = Color(0xFF474552)
-                                    )
-                                }
-                            }
-                        }
-
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "Details",
-                            tint = Color(0xFF474552),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                // Member 2: You (Parent)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -651,28 +890,17 @@ fun ParentDashboardScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Box(modifier = Modifier.size(44.dp)) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(SARAH_AVATAR_URL)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = "Sarah",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF10B981))
-                                        .border(1.5.dp, Color.White, CircleShape)
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF43359F)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
                             }
 
                             Column {
@@ -681,7 +909,7 @@ fun ParentDashboardScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
-                                        text = "You",
+                                        text = "$parentDisplayName (You)",
                                         fontSize = 14.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF121C2A)
@@ -712,7 +940,7 @@ fun ParentDashboardScreen(
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Text(
-                                        text = "Active • Guarding SafeZone Home",
+                                        text = "Primary Guardian • Monitoring Active",
                                         fontSize = 11.5.sp,
                                         color = Color(0xFF474552)
                                     )
@@ -726,6 +954,140 @@ fun ParentDashboardScreen(
                             tint = Color(0xFF474552),
                             modifier = Modifier.size(20.dp)
                         )
+                    }
+                }
+
+                // If linked students exist, render them!
+                if (linkedStudents.isNotEmpty()) {
+                    linkedStudents.forEach { student ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFFEFF4FF))
+                                .clickable { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) }
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF006398)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.School, contentDescription = null, tint = Color.White)
+                                    }
+
+                                    Column {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = student.studentName.ifBlank { "Student" },
+                                                fontSize = 14.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF121C2A)
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(Color(0xFFCCE5FF))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Student",
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF004B73)
+                                                )
+                                            }
+                                        }
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.BatteryChargingFull,
+                                                contentDescription = "Battery",
+                                                tint = Color(0xFF006B49),
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = "Protected • GPS Active",
+                                                fontSize = 11.5.sp,
+                                                color = Color(0xFF474552)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = "Details",
+                                    tint = Color(0xFF474552),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Empty state: unlinked child prompt
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFFF8FAFC))
+                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
+                            .clickable { viewModel.navigateTo(ScreenDestination.ENTER_LINK_CODE) }
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFE0E7FF)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.AddLink, contentDescription = null, tint = Color(0xFF4F46E5), modifier = Modifier.size(20.dp))
+                                }
+                                Column {
+                                    Text(
+                                        text = "No Child Linked Yet",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1E293B)
+                                    )
+                                    Text(
+                                        text = "Tap to enter 6-digit code or scan QR from student app",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF64748B)
+                                    )
+                                }
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = Color(0xFF4F46E5), modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
             }
@@ -835,86 +1197,130 @@ fun ParentDashboardScreen(
                     )
                 }
 
-                // Map View Box
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) }
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(MAP_PREVIEW_URL)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Seattle Telemetry Map",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    // Overlay pill at bottom
+                // Telemetry View Box
+                if (linkedStudents.isNotEmpty()) {
+                    val firstStudent = linkedStudents.first()
                     Box(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White.copy(alpha = 0.92f))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) }
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(MAP_PREVIEW_URL)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Live Telemetry Map",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // Overlay pill at bottom
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White.copy(alpha = 0.94f))
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.weight(1f)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.NearMe,
+                                            contentDescription = "Navigation",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "${firstStudent.studentName} • Live Location",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF121C2A)
+                                        )
+                                        Text(
+                                            text = "Active Sync • GPS Transmitting",
+                                            fontSize = 10.5.sp,
+                                            color = Color(0xFF474552)
+                                        )
+                                    }
+                                }
+
                                 Box(
                                     modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary),
-                                    contentAlignment = Alignment.Center
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color(0xFF006398))
+                                        .clickable { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) }
+                                        .padding(horizontal = 12.dp, vertical = 5.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.NearMe,
-                                        contentDescription = "Navigation",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Column {
                                     Text(
-                                        text = "Highland Way & 4th Ave",
-                                        fontSize = 12.sp,
+                                        text = "Track",
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF121C2A)
-                                    )
-                                    Text(
-                                        text = "En route to North Community...",
-                                        fontSize = 10.5.sp,
-                                        color = Color(0xFF474552)
+                                        color = Color.White
                                     )
                                 }
                             }
-
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFFF8FAFC))
+                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
+                            .padding(20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(Color(0xFF006398))
-                                    .clickable { viewModel.navigateTo(ScreenDestination.FAMILY_MAP) }
-                                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFEFF4FF)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "Track",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                Icon(Icons.Default.ShareLocation, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                            }
+                            Text("No Telemetry Stream Active", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1E293B))
+                            Text(
+                                text = "Link a student device to monitor real-time GPS telemetry, geofence status, and travel routes.",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFF64748B),
+                                textAlign = TextAlign.Center
+                            )
+                            Button(
+                                onClick = { viewModel.navigateTo(ScreenDestination.ENTER_LINK_CODE) },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.AddLink, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Link Child Phone", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
@@ -1005,31 +1411,38 @@ fun StudentDashboardScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                val studentProfile by viewModel.firestoreProfile.collectAsState()
+                val studentDisplayName = studentProfile?.displayName?.ifBlank { null } ?: "Student"
+                val linkedParents by viewModel.linkedParents.collectAsState()
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(ALEX_AVATAR_URL)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Alex",
-                        contentScale = ContentScale.Crop,
+                    Box(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
-                    )
+                            .background(Color(0xFF006398)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.School,
+                            contentDescription = "Student",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
                     Column {
                         Text(
-                            text = "Hi Alex! 👋",
+                            text = "Hi $studentDisplayName! 👋",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF121C2A)
                         )
                         Text(
-                            text = "Stay safe. You've got this!",
+                            text = if (linkedParents.isNotEmpty()) "Connected to ${linkedParents.first().parentName}" else "Stay safe. You've got this!",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.primary
@@ -1068,6 +1481,8 @@ fun StudentDashboardScreen(
         val isTrackingActive by viewModel.isLocationTrackingActive.collectAsState()
         val incomingCameraReq by viewModel.incomingCameraRequestForStudent.collectAsState()
         val linkedParents by viewModel.linkedParents.collectAsState()
+        val studentActiveJourneys by viewModel.studentActiveJourneys.collectAsState()
+        val studentActiveRides by viewModel.studentActiveRides.collectAsState()
 
         // 1. URGENT: Incoming Camera Check Request Dialog/Card
         if (incomingCameraReq != null) {
@@ -1231,136 +1646,163 @@ fun StudentDashboardScreen(
             }
         }
 
-        // Journey Active Green Card
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF006B49),
-                            Color(0xFF005036)
+        // =====================================================================
+        // REAL-TIME STUDENT ACTIVE JOURNEYS & SHARED RIDES DISPLAY
+        // =====================================================================
+        if (studentActiveJourneys.isNotEmpty()) {
+            studentActiveJourneys.forEach { journey ->
+                val isApproved = journey.status == "APPROVED"
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = if (isApproved) listOf(Color(0xFF006B49), Color(0xFF005036))
+                                else listOf(Color(0xFF1E3A8A), Color(0xFF172554))
+                            )
                         )
-                    )
-                )
-                .padding(18.dp)
-                .testTag("student_journey_active_card")
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(18.dp)
+                        .testTag("student_journey_active_card")
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color.White.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Verified,
-                                contentDescription = "Active",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color.White.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isApproved) Icons.Default.Verified else Icons.Default.DirectionsCar,
+                                        contentDescription = "Active",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+
+                                Column {
+                                    Text(
+                                        text = if (isApproved) "JOURNEY ACTIVE" else "JOURNEY REQUEST SENT",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isApproved) Color(0xFF62EFB3) else Color(0xFF93C5FD),
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    Text(
+                                        text = "${journey.origin.ifBlank { "Origin" }} → ${journey.destination.ifBlank { "Destination" }}",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha = 0.2f))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (isApproved) "Approved" else "Waiting Approval",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
                         }
 
-                        Column {
+                        // Embedded Predicted Route Display from Source to Destination
+                        PredictedRouteCard(
+                            origin = journey.origin.ifBlank { "Origin" },
+                            destination = journey.destination.ifBlank { "Destination" },
+                            distanceKm = "4.2 km",
+                            duration = journey.expectedArrival.ifBlank { "20 min" },
+                            safetyScore = 98,
+                            travelMode = journey.travelMode
+                        )
+
+                        // ETA & Action
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                text = "JOURNEY ACTIVE",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF62EFB3),
-                                letterSpacing = 0.5.sp
+                                text = "ETA: ${journey.expectedArrival.ifBlank { "20 min" }}",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.85f)
                             )
-                            Text(
-                                text = "School → Home",
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { viewModel.triggerImOk() }
+                            ) {
+                                Text(
+                                    text = "Send 'I'm OK' Ping",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Next",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "Active",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
                 }
-
-                // Progress Bar and Stats
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Ends in 1h 20m",
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                        Text(
-                            text = "64% Completed",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                    LinearProgressIndicator(
-                        progress = { 0.64f },
-                        color = Color(0xFF4EDEA3),
-                        trackColor = Color.Black.copy(alpha = 0.25f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                    )
-                }
-
-                // ETA & Action
-                Row(
+            }
+        } else if (studentActiveRides.isNotEmpty()) {
+            studentActiveRides.forEach { ride ->
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Text(
-                        text = "ETA: 4:15 PM",
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.LocalTaxi, null, tint = Color(0xFF38BDF8), modifier = Modifier.size(20.dp))
+                                Column {
+                                    Text("SOLO TRANSPORT ACTIVE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
+                                    Text("${ride.appUsed} • ${ride.vehicleNumber}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF16A34A))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("Shared with Parent ✓", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { viewModel.triggerImOk() }
-                    ) {
-                        Text(
-                            text = "Notify Parents of Stop",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Next",
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
+                        PredictedRouteCard(
+                            origin = ride.pickupLocation.ifBlank { "Pickup" },
+                            destination = ride.dropLocation.ifBlank { "Drop" },
+                            distanceKm = "5.2 km",
+                            duration = ride.estimatedTime.ifBlank { "22 min" },
+                            safetyScore = 99,
+                            travelMode = ride.appUsed
                         )
                     }
                 }
@@ -1408,6 +1850,15 @@ fun StudentDashboardScreen(
                         onClick = { viewModel.navigateTo(ScreenDestination.REQUEST_JOURNEY) }
                     )
 
+                    // Student-only: Solo Transport Verification (Uber/Ola/Rapido)
+                    QuickActionItem(
+                        title = "Solo\nTransport",
+                        icon = Icons.Default.LocalTaxi,
+                        bgColor = Color(0xFFD97706),
+                        iconTint = Color.White,
+                        onClick = { viewModel.navigateTo(ScreenDestination.SOLO_TRANSPORT) }
+                    )
+
                     // Both: Emergency SOS
                     QuickActionItem(
                         title = "Emergency\nSOS",
@@ -1415,15 +1866,6 @@ fun StudentDashboardScreen(
                         bgColor = Color(0xFFBA1A1A),
                         iconTint = Color.White,
                         onClick = { viewModel.navigateTo(ScreenDestination.EMERGENCY) }
-                    )
-
-                    // Both: Settings
-                    QuickActionItem(
-                        title = "Settings\n ",
-                        icon = Icons.Default.Settings,
-                        bgColor = Color(0xFFDEE9FC),
-                        iconTint = Color(0xFF121C2A),
-                        onClick = { viewModel.navigateTo(ScreenDestination.SETTINGS) }
                     )
                 }
             }
@@ -1461,6 +1903,7 @@ fun StudentDashboardScreen(
                 }
 
                 // Item 1: Location shared
+                val isParentLinked = linkedParents.isNotEmpty()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1475,7 +1918,8 @@ fun StudentDashboardScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -1493,13 +1937,14 @@ fun StudentDashboardScreen(
                             }
                             Column {
                                 Text(
-                                    text = "Location shared",
+                                    text = "Location Sharing",
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF121C2A)
                                 )
                                 Text(
-                                    text = "Shared with Mom & Dad via GPS",
+                                    text = if (isParentLinked) "Shared with ${linkedParents.first().parentName} via GPS"
+                                           else "Standby • Link a parent device",
                                     fontSize = 11.sp,
                                     color = Color(0xFF474552)
                                 )
@@ -1508,15 +1953,18 @@ fun StudentDashboardScreen(
 
                         Box(
                             modifier = Modifier
+                                .wrapContentWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF6FFBBE))
+                                .background(if (isParentLinked) Color(0xFF6FFBBE) else Color(0xFFE2E8F0))
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = "Active",
+                                text = if (isParentLinked) "Active" else "Standby",
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF005236)
+                                color = if (isParentLinked) Color(0xFF005236) else Color(0xFF475569),
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -1537,7 +1985,8 @@ fun StudentDashboardScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -1555,13 +2004,14 @@ fun StudentDashboardScreen(
                             }
                             Column {
                                 Text(
-                                    text = "Camera verification",
+                                    text = "Camera Verification",
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF121C2A)
                                 )
                                 Text(
-                                    text = "Check-in confirmed at 3:10 PM",
+                                    text = if (isParentLinked) "Guardian remote safety link ready"
+                                           else "Standby • Awaiting guardian link",
                                     fontSize = 11.sp,
                                     color = Color(0xFF474552)
                                 )
@@ -1570,15 +2020,18 @@ fun StudentDashboardScreen(
 
                         Box(
                             modifier = Modifier
+                                .wrapContentWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF6FFBBE))
+                                .background(if (isParentLinked) Color(0xFF6FFBBE) else Color(0xFFE2E8F0))
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = "Active",
+                                text = if (isParentLinked) "Active" else "Standby",
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF005236)
+                                color = if (isParentLinked) Color(0xFF005236) else Color(0xFF475569),
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }

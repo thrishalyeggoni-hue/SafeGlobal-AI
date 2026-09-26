@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // User Profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Family Links
+    match /familyLinks/{linkId} {
+      allow read: if isAuthenticated() && (
+        resource.data.parentUid == request.auth.uid || 
+        resource.data.studentUid == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.parentUid == request.auth.uid ||
+        request.resource.data.studentUid == request.auth.uid
+      );
+      allow update, delete: if isAuthenticated() && (
+        resource.data.parentUid == request.auth.uid || 
+        resource.data.studentUid == request.auth.uid
+      );
+    }
+    
+    // Temporary 6-Digit Link Invites
+    match /linkInvites/{code} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.studentUid == request.auth.uid;
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && resource.data.studentUid == request.auth.uid;
+    }
+    
+    // Helper: Verify accepted family link exists between parent and child
+    function hasAcceptedLink(parentUid, childUid) {
+      return exists(/databases/$(database)/documents/familyLinks/$(parentUid + "_" + childUid)) ||
+             exists(/databases/$(database)/documents/familyLinks/$(childUid + "_" + parentUid));
+    }
+    
+    // Camera Sessions (Requirement 20: Server-side security enforcement)
+    match /cameraSessions/{sessionId} {
+      // Only linked parent can initiate session; student must be the target
+      allow create: if isAuthenticated() &&
+        request.auth.uid == request.resource.data.parentUid &&
+        hasAcceptedLink(request.resource.data.parentUid, request.resource.data.childUid);
+        
+      // Only participating parent and child can read and update session
+      allow read: if isAuthenticated() && (
+        resource.data.parentUid == request.auth.uid ||
+        resource.data.childUid == request.auth.uid
+      );
+      
+      allow update: if isAuthenticated() && (
+        resource.data.parentUid == request.auth.uid ||
+        resource.data.childUid == request.auth.uid
+      );
+      
+      allow delete: if isAuthenticated() && (
+        resource.data.parentUid == request.auth.uid ||
+        resource.data.childUid == request.auth.uid
+      );
+
+      // WebRTC ICE Candidate Subcollections
+      match /childCandidates/{candidateId} {
+        allow read, write: if isAuthenticated();
+      }
+      match /parentCandidates/{candidateId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+    
+    // Student Live Location
+    match /studentLocations/{studentUid} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Safe Zones & Geofence Alerts
+    match /safeZones/{zoneId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /geofenceEvents/{eventId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Emergency & FCM Tokens
+    match /fcmTokens/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}

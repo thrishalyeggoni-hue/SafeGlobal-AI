@@ -55,6 +55,10 @@ class LocationTrackingService : Service() {
 
         private const val CHANNEL_ID = "safesphere_live_location_channel"
         private const val NOTIFICATION_ID = 4001
+        private const val PREFS_NAME = "location_tracking_service_prefs"
+        private const val PREF_KEY_STUDENT_UID = "pref_student_uid"
+        private const val PREF_KEY_STUDENT_NAME = "pref_student_name"
+        private const val PREF_KEY_IS_TRACKING = "pref_is_tracking"
 
         private val _isTrackingActive = MutableStateFlow(false)
         val isTrackingActive = _isTrackingActive.asStateFlow()
@@ -98,16 +102,38 @@ class LocationTrackingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
         when (intent?.action) {
             ACTION_START -> {
                 studentUid = intent.getStringExtra(EXTRA_STUDENT_UID) ?: ""
                 studentName = intent.getStringExtra(EXTRA_STUDENT_NAME) ?: "Student"
+                prefs.edit()
+                    .putString(PREF_KEY_STUDENT_UID, studentUid)
+                    .putString(PREF_KEY_STUDENT_NAME, studentName)
+                    .putBoolean(PREF_KEY_IS_TRACKING, true)
+                    .apply()
                 startForegroundTracking()
                 listenToSafeZones()
             }
             ACTION_STOP -> {
+                prefs.edit().putBoolean(PREF_KEY_IS_TRACKING, false).apply()
                 stopTracking()
                 stopSelf()
+            }
+            else -> {
+                // If restarted by Android system after process death (START_STICKY null intent)
+                val wasTracking = prefs.getBoolean(PREF_KEY_IS_TRACKING, false)
+                val savedUid = prefs.getString(PREF_KEY_STUDENT_UID, null)
+                val savedName = prefs.getString(PREF_KEY_STUDENT_NAME, "Student") ?: "Student"
+                if (wasTracking && !savedUid.isNullOrBlank()) {
+                    studentUid = savedUid
+                    studentName = savedName
+                    startForegroundTracking()
+                    listenToSafeZones()
+                } else {
+                    stopSelf()
+                }
             }
         }
         return START_STICKY
@@ -281,6 +307,8 @@ class LocationTrackingService : Service() {
         } catch (e: Exception) {
             // Ignore
         }
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(PREF_KEY_IS_TRACKING, false).apply()
         _isTrackingActive.value = false
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
