@@ -19,7 +19,12 @@ import java.util.concurrent.TimeUnit
  */
 object FirebaseAuthManager {
 
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth?
+        get() = try {
+            FirebaseAuth.getInstance()
+        } catch (e: Exception) {
+            null
+        }
 
     // Stored verification ID from Firebase (used to confirm OTP)
     private var verificationId: String? = null
@@ -28,7 +33,7 @@ object FirebaseAuthManager {
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    val currentUser: FirebaseUser? get() = auth.currentUser
+    val currentUser: FirebaseUser? get() = auth?.currentUser
 
     sealed class AuthState {
         object Idle : AuthState()
@@ -72,7 +77,12 @@ object FirebaseAuthManager {
             }
         }
 
-        val options = PhoneAuthOptions.newBuilder(auth)
+        val currentAuth = auth ?: run {
+            _authState.value = AuthState.Error("Firebase is not configured. Please add a valid google-services.json file.")
+            return
+        }
+
+        val options = PhoneAuthOptions.newBuilder(currentAuth)
             .setPhoneNumber(phoneNumber)
             .setTimeout(60L, TimeUnit.SECONDS)
             .setActivity(activity)
@@ -86,6 +96,11 @@ object FirebaseAuthManager {
      * Resends OTP using the stored resend token.
      */
     fun resendOtp(phoneNumber: String, activity: Activity) {
+        val currentAuth = auth ?: run {
+            _authState.value = AuthState.Error("Firebase is not configured.")
+            return
+        }
+
         val token = resendToken ?: run {
             sendOtp(phoneNumber, activity)
             return
@@ -109,7 +124,7 @@ object FirebaseAuthManager {
             }
         }
 
-        val options = PhoneAuthOptions.newBuilder(auth)
+        val options = PhoneAuthOptions.newBuilder(currentAuth)
             .setPhoneNumber(phoneNumber)
             .setTimeout(60L, TimeUnit.SECONDS)
             .setActivity(activity)
@@ -140,7 +155,12 @@ object FirebaseAuthManager {
     }
 
     private fun signInWithCredential(credential: PhoneAuthCredential) {
-        auth.signInWithCredential(credential)
+        val currentAuth = auth ?: run {
+            _authState.value = AuthState.Error("Firebase is not configured.")
+            return
+        }
+
+        currentAuth.signInWithCredential(credential)
             .addOnSuccessListener { result ->
                 result.user?.let { user ->
                     _authState.value = AuthState.Authenticated(user)
@@ -159,7 +179,7 @@ object FirebaseAuthManager {
     }
 
     fun signOut() {
-        auth.signOut()
+        auth?.signOut()
         verificationId = null
         resendToken = null
         _authState.value = AuthState.Idle

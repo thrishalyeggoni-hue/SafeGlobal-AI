@@ -1,697 +1,1804 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0"/>
-  <title>SafeSphere Family - Responsive Multi-Device Platform</title>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <title>SafeSphere Family — Verify. Monitor. Protect.</title>
+  <meta name="description" content="SafeSphere Family is a consent-based family journey safety platform for students and parents. Verify drivers, monitor journeys, and protect your family."/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
   <style>
+    /* ══════════════════════════════════════════════════════
+       DESIGN TOKENS
+    ══════════════════════════════════════════════════════ */
+    :root {
+      --brand-blue:    #1D61F2;
+      --brand-indigo:  #6366F1;
+      --brand-teal:    #14B8A6;
+      --brand-green:   #10B981;
+      --brand-orange:  #F59E0B;
+      --brand-rose:    #F43F5E;
+      --brand-violet:  #8B5CF6;
+      --surface:       #F8FAFC;
+      --surface-2:     #F1F5F9;
+      --card:          #FFFFFF;
+      --border:        #E2E8F0;
+      --text-primary:  #0F172A;
+      --text-secondary:#475569;
+      --text-muted:    #94A3B8;
+      --shadow-sm:     0 1px 4px rgba(0,0,0,.07);
+      --shadow-md:     0 4px 16px rgba(0,0,0,.10);
+      --shadow-lg:     0 8px 32px rgba(0,0,0,.13);
+      --radius-sm:     8px;
+      --radius-md:     14px;
+      --radius-lg:     20px;
+      --radius-full:   9999px;
+    }
+
+    /* ── Reset & Base ───────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
     body {
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: #0F172A;
+      color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
     }
-    @keyframes spinSmooth {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    img { display: block; max-width: 100%; }
+    button { cursor: pointer; border: none; outline: none; font-family: inherit; }
+    a { text-decoration: none; color: inherit; }
+
+    /* ══════════════════════════════════════════════════════
+       TOP-CENTER LOADING INDICATOR
+    ══════════════════════════════════════════════════════ */
+    #loading-pill-wrap {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      pointer-events: none;
     }
-    @keyframes pulseGlow {
-      0%, 100% { opacity: 0.35; transform: scale(0.9); }
-      50% { opacity: 0.85; transform: scale(1.15); }
+    #loading-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0F172A;
+      border: 1px solid rgba(99,179,237,.35);
+      border-radius: var(--radius-full);
+      padding: 6px 16px 6px 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(99,179,237,.15);
+      pointer-events: auto;
+      transition: opacity .3s, transform .3s;
+      backdrop-filter: blur(12px);
     }
-    @keyframes progressShimmer {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(200%); }
+    #loading-pill.hidden { opacity: 0; transform: translateY(-16px) translateX(-50%); pointer-events: none; }
+    /* Circular dot spinner (12 dots) */
+    .dot-ring {
+      width: 20px;
+      height: 20px;
+      position: relative;
+      flex-shrink: 0;
     }
-    .animate-spin-radar {
-      animation: spinSmooth 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    .dot-ring span {
+      position: absolute;
+      width: 3.5px;
+      height: 3.5px;
+      border-radius: 50%;
+      background: #38BDF8;
+      left: 50%;
+      top: 50%;
+      transform-origin: 0 0;
     }
-    .animate-pulse-glow {
-      animation: pulseGlow 1.8s ease-in-out infinite;
+    @keyframes dotFade {
+      0%,100% { opacity: 0.12; }
+      50%      { opacity: 1; }
     }
-    .animate-shimmer {
-      animation: progressShimmer 1.4s ease-in-out infinite;
+    /* idle beacon */
+    .idle-beacon {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--brand-green);
+      box-shadow: 0 0 0 4px rgba(16,185,129,.2);
+      animation: beaconPulse 2s ease-in-out infinite;
+      flex-shrink: 0;
     }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    .screen-view {
-      transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    @keyframes beaconPulse {
+      0%,100%{ box-shadow: 0 0 0 3px rgba(16,185,129,.25); }
+      50%    { box-shadow: 0 0 0 7px rgba(16,185,129,.08); }
     }
+    #pill-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #F1F5F9;
+      letter-spacing: .2px;
+      white-space: nowrap;
+    }
+    .sync-chip {
+      font-size: 9px;
+      font-weight: 700;
+      color: #1D4ED8;
+      background: #EFF6FF;
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PAGE HEADER / HERO
+    ══════════════════════════════════════════════════════ */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 80px 24px 48px;
+      background: linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(99,179,237,.1);
+      border: 1px solid rgba(99,179,237,.25);
+      border-radius: var(--radius-full);
+      padding: 4px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #7DD3FC;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .hero-logo {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg,#6366F1,#1D61F2);
+      border-radius: 22px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 32px rgba(99,102,241,.4);
+    }
+    .hero h1 {
+      font-size: clamp(28px,5vw,52px);
+      font-weight: 800;
+      color: #F8FAFC;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+    .hero h1 span { color: #38BDF8; }
+    .hero-tagline {
+      font-size: clamp(13px,2vw,17px);
+      color: #94A3B8;
+      margin-bottom: 32px;
+      font-style: italic;
+      letter-spacing: .3px;
+    }
+    .hero-actions {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+    }
+    .btn-primary {
+      background: var(--brand-blue);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 12px 28px;
+      border-radius: var(--radius-full);
+      box-shadow: 0 4px 16px rgba(29,97,242,.45);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(29,97,242,.55); }
+    .btn-outline {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.2);
+      color: #CBD5E1;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 12px 28px;
+      border-radius: var(--radius-full);
+      transition: border-color .15s, color .15s;
+    }
+    .btn-outline:hover { border-color: #38BDF8; color: #38BDF8; }
+
+    /* ══════════════════════════════════════════════════════
+       FEATURE STRIP
+    ══════════════════════════════════════════════════════ */
+    .feature-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      padding: 28px 24px;
+      background: #1E293B;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .feat-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius-full);
+      padding: 6px 14px;
+      font-size: 11.5px;
+      color: #CBD5E1;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .feat-chip .icon { font-size: 13px; }
+
+    /* ══════════════════════════════════════════════════════
+       SCREEN GALLERY SECTION
+    ══════════════════════════════════════════════════════ */
+    .section { padding: 60px 24px; }
+    .section-inner { max-width: 1280px; margin: 0 auto; }
+    .section-label {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #38BDF8;
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: clamp(22px,3.5vw,36px);
+      font-weight: 800;
+      color: #F8FAFC;
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+    .section-subtitle {
+      font-size: 14px;
+      color: #94A3B8;
+      margin-bottom: 40px;
+      max-width: 600px;
+    }
+
+    /* ── Phone frame grid ──────────────────────────────── */
+    .screens-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 20px;
+    }
+    @media(min-width:640px)  { .screens-grid { grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); } }
+    @media(min-width:1024px) { .screens-grid { grid-template-columns: repeat(4,1fr); gap: 24px; } }
+    @media(min-width:1280px) { .screens-grid { grid-template-columns: repeat(5,1fr); } }
+
+    .phone-card {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      cursor: pointer;
+      transition: transform .2s;
+    }
+    .phone-card:hover { transform: translateY(-4px); }
+    .phone-card:hover .phone-frame { box-shadow: 0 16px 48px rgba(29,97,242,.35); }
+
+    .phone-frame {
+      width: 100%;
+      aspect-ratio: 9/19;
+      background: var(--card);
+      border-radius: 24px;
+      border: 6px solid #1E293B;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.08);
+      overflow: hidden;
+      position: relative;
+      transition: box-shadow .2s;
+    }
+    /* notch */
+    .phone-frame::before {
+      content: '';
+      position: absolute; top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 28%; height: 5px;
+      background: #1E293B;
+      border-radius: 0 0 8px 8px;
+      z-index: 10;
+    }
+    .phone-screen {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      font-size: 7px;
+    }
+
+    .phone-label {
+      font-size: 11px; font-weight: 600;
+      color: #94A3B8;
+      text-align: center;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       INDIVIDUAL SCREEN DESIGNS
+    ══════════════════════════════════════════════════════ */
+
+    /* shared mini status bar */
+    .mini-sb {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 8px 2px;
+      font-size: 6px; font-weight: 700; color: #0F172A;
+    }
+    .mini-sb.dark { color: #F8FAFC; background: transparent; }
+
+    /* ── 1. Splash ───────────────────────────────────────── */
+    .splash-screen {
+      background: linear-gradient(160deg,#EFF6FF 0%,#F8FAFC 100%);
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 8px;
+      padding: 12px;
+    }
+    .splash-logo-circle {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg,#6366F1 0%,#1D61F2 50%,#14B8A6 100%);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 6px 20px rgba(99,102,241,.4);
+      animation: logoFloat 3s ease-in-out infinite;
+    }
+    @keyframes logoFloat {
+      0%,100%{ transform: scale(1); }
+      50%    { transform: scale(1.04); }
+    }
+    .splash-name { font-size: 14px; font-weight: 800; color: #0F172A; }
+    .splash-sub  { font-size: 9px; font-weight: 600; color: #6366F1; letter-spacing: .3px; }
+    .splash-tag  { font-size: 7px; font-style: italic; color: #94A3B8; }
+
+    /* ── 2. Loading ─────────────────────────────────────── */
+    .loading-screen {
+      background: linear-gradient(160deg,#EFF6FF 0%,#F8FAFC 100%);
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:12px; padding:12px;
+    }
+    .loading-logo-small {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg,#6366F1,#1D61F2);
+      border-radius: 10px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px;
+    }
+    .mini-dot-ring {
+      width: 32px; height: 32px; position: relative;
+    }
+    .mini-dot-ring span {
+      position:absolute; width:3px; height:3px;
+      border-radius:50%; background:#6366F1;
+      left:50%; top:50%; transform-origin:0 0;
+    }
+    .loading-tagline { font-size:8px; color:#64748B; font-style:italic; text-align:center; }
+
+    /* ── 3. Consent ─────────────────────────────────────── */
+    .consent-screen {
+      background:#F8FAFC; flex:1; display:flex; flex-direction:column; padding:8px; gap:5px; overflow:hidden;
+    }
+    .consent-title { font-size:9px; font-weight:800; color:#0F172A; }
+    .consent-sub { font-size:6.5px; color:#64748B; }
+    .consent-item {
+      display:flex; align-items:center; gap:4px; font-size:6px; color:#475569;
+    }
+    .consent-item .dot { width:4px;height:4px;border-radius:50%;background:#6366F1;flex-shrink:0; }
+    .consent-warn {
+      background:#FEF2F2; border:1px solid #FECACA; border-radius:6px;
+      padding:4px; font-size:5.5px; color:#EF4444;
+    }
+    .consent-check { display:flex; align-items:center; gap:4px; font-size:6px; }
+    .consent-check input { width:8px; height:8px; }
+    .mini-btn {
+      background:#1D61F2; color:#fff; font-weight:700; font-size:7px;
+      padding:5px 12px; border-radius:var(--radius-full); width:100%;
+      text-align:center; margin-top:auto;
+    }
+
+    /* ── 4. Phone Verify ───────────────────────────────── */
+    .phone-screen-ui {
+      background:#F8FAFC; flex:1; display:flex; flex-direction:column;
+      padding:8px; gap:6px;
+    }
+    .back-row { display:flex; align-items:center; gap:4px; }
+    .back-row .back-icon { width:14px;height:14px;border-radius:4px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:8px; }
+    .screen-heading { font-size:12px; font-weight:800; color:#0F172A; }
+    .screen-subhead { font-size:6.5px; color:#64748B; }
+    .mini-input {
+      height:18px; border:1.5px solid #CBD5E1; border-radius:6px;
+      background:#fff; display:flex; align-items:center; padding:0 6px;
+      font-size:6px; color:#64748B; gap:4px;
+    }
+    .mini-input .flag { font-size:8px; }
+    .mini-input-text { font-size:6px; color:#94A3B8; }
+    .mini-small-text { font-size:5.5px; color:#94A3B8; text-align:center; }
+
+    /* ── 5. OTP ────────────────────────────────────────── */
+    .otp-boxes { display:flex; gap:4px; justify-content:center; }
+    .otp-box {
+      width:18px; height:20px;
+      border:1.5px solid #CBD5E1; border-radius:5px;
+      background:#fff; display:flex; align-items:center; justify-content:center;
+      font-size:9px; font-weight:700; color:#0F172A;
+    }
+    .otp-box.filled { border-color:#1D61F2; background:#EFF6FF; }
+    .resend-text { font-size:6px; color:#94A3B8; text-align:center; }
+
+    /* ── 6. Choose Role ────────────────────────────────── */
+    .role-card {
+      border:1.5px solid #E2E8F0; border-radius:8px; padding:6px;
+      display:flex; align-items:center; gap:5px;
+      background:#fff; cursor:pointer;
+      transition: border-color .15s;
+    }
+    .role-card.selected { border-color:#1D61F2; background:#EFF6FF; }
+    .role-icon { width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px; }
+    .role-icon.parent { background:#EFF6FF; }
+    .role-icon.student { background:#F0FDF4; }
+    .role-text h4 { font-size:7px; font-weight:700; color:#0F172A; }
+    .role-text p  { font-size:5.5px; color:#64748B; }
+
+    /* ── 7. Create ID / 8. Password ───────────────────── */
+    .form-screen {
+      background:#F8FAFC; flex:1; display:flex; flex-direction:column; padding:8px; gap:6px;
+    }
+    .pw-check { display:flex; align-items:center; gap:3px; font-size:5.5px; color:#10B981; }
+    .pw-check .x { width:7px;height:7px;border-radius:50%;background:#EFF6FF;border:1px solid #1D61F2;display:flex;align-items:center;justify-content:center;font-size:4px;color:#1D61F2; }
+
+    /* ── 9. Profile ─────────────────────────────────────── */
+    .avatar-circle {
+      width:28px;height:28px;border-radius:50%;background:#E2E8F0;
+      display:flex;align-items:center;justify-content:center;font-size:14px;
+      margin:0 auto;
+    }
+    .mini-label { font-size:5.5px; color:#64748B; font-weight:600; margin-bottom:1px; }
+    .mini-value { font-size:7px; color:#0F172A; }
+
+    /* ── 10. Parent Dashboard ──────────────────────────── */
+    .parent-dash {
+      background:#F1F5F9; flex:1; display:flex; flex-direction:column; overflow:hidden;
+    }
+    .dash-header {
+      background:#fff; padding:6px 8px; display:flex; justify-content:space-between;
+      align-items:center; border-bottom:1px solid #F1F5F9;
+    }
+    .dash-greeting { font-size:7.5px; font-weight:800; color:#0F172A; }
+    .dash-sub { font-size:5.5px; color:#64748B; }
+    .notification-dot {
+      width:16px;height:16px;border-radius:50%;background:#F1F5F9;
+      display:flex;align-items:center;justify-content:center;font-size:9px; position:relative;
+    }
+    .notification-dot::after {
+      content:''; position:absolute; top:0; right:0;
+      width:5px;height:5px;border-radius:50%;background:#EF4444;border:1px solid #fff;
+    }
+    .family-status-pill {
+      margin:6px 8px; background:linear-gradient(135deg,#EFF6FF,#F0FDF4);
+      border:1px solid #BBF7D0; border-radius:8px; padding:5px 7px;
+      display:flex; align-items:center; gap:4px;
+    }
+    .status-icon-sm { font-size:10px; }
+    .status-text { font-size:6.5px; font-weight:700; color:#059669; }
+    .student-mini-card {
+      margin:0 8px; border:1px solid #E2E8F0; border-radius:8px; padding:5px 7px;
+      background:#fff; display:flex; align-items:center; gap:5px;
+    }
+    .stu-ava { width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#1D61F2);display:flex;align-items:center;justify-content:center;font-size:9px; }
+    .stu-info { flex:1; }
+    .stu-name { font-size:7px; font-weight:700; color:#0F172A; }
+    .stu-status { font-size:5.5px; color:#10B981; font-weight:600; }
+    .view-btn { font-size:5.5px; color:#1D61F2; font-weight:700; background:#EFF6FF; padding:2px 5px; border-radius:4px; }
+    .dash-qa-title { font-size:6.5px; font-weight:700; color:#0F172A; padding:5px 8px 2px; }
+    .qa-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:0 8px; }
+    .qa-btn {
+      background:#fff; border:1px solid #E2E8F0; border-radius:7px;
+      padding:5px; display:flex; flex-direction:column; align-items:center; gap:2px;
+    }
+    .qa-btn .qi { font-size:12px; }
+    .qa-btn .ql { font-size:5px; font-weight:600; color:#475569; text-align:center; }
+    .bottom-nav-mini {
+      margin-top:auto; background:#fff; border-top:1px solid #F1F5F9;
+      display:flex; justify-content:space-around; padding:4px 0;
+    }
+    .bn-item { display:flex;flex-direction:column;align-items:center;gap:1px; }
+    .bn-icon { font-size:9px; color:#94A3B8; }
+    .bn-icon.active { color:#1D61F2; }
+    .bn-text { font-size:4.5px; color:#94A3B8; font-weight:600; }
+    .bn-text.active { color:#1D61F2; }
+
+    /* ── 11. Student Dashboard ─────────────────────────── */
+    .stu-dash { background:#F1F5F9; flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    .stu-status-section { margin:6px 8px; display:flex;flex-direction:column;gap:4px; }
+    .stu-status-chip {
+      display:flex;align-items:center;gap:4px; background:#F0FDF4;
+      border:1px solid #BBF7D0; border-radius:6px; padding:3px 6px;
+    }
+    .stu-status-chip .cs-dot { width:5px;height:5px;border-radius:50%;background:#10B981; }
+    .stu-status-chip .cs-text { font-size:6px; color:#059669; font-weight:600; }
+    .active-badge {
+      background:#DBEAFE; color:#1D4ED8; font-size:5.5px; font-weight:700;
+      padding:2px 6px; border-radius:var(--radius-full);
+    }
+
+    /* ── 12. Family Map ─────────────────────────────────── */
+    .map-screen { background:#E5E7EB; flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    .map-header { background:#fff; padding:5px 8px; display:flex;align-items:center;gap:5px;border-bottom:1px solid #F1F5F9; }
+    .map-body {
+      flex:1; background:linear-gradient(180deg,#BFDBFE 0%,#93C5FD 40%,#60A5FA 100%);
+      position:relative; display:flex;align-items:flex-end;
+    }
+    .map-overlay { position:absolute;inset:0; }
+    /* fake roads */
+    .fake-road {
+      position:absolute; background:rgba(255,255,255,.5); border-radius:2px;
+    }
+    .map-pin { position:absolute; font-size:14px; filter:drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
+    .map-route {
+      position:absolute; width:2px; background:linear-gradient(#1D61F2,#10B981);
+      border-radius:1px; top:20%; left:35%; height:50%;
+      transform:rotate(15deg);
+    }
+    .map-info-card {
+      background:#fff; border-radius:10px 10px 0 0; padding:6px 8px;
+      display:flex;align-items:center;gap:5px; z-index:1; width:100%;
+    }
+    .map-ava { width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#1D61F2);font-size:10px;display:flex;align-items:center;justify-content:center; }
+    .map-info .t { font-size:7px;font-weight:700;color:#0F172A; }
+    .map-info .s { font-size:5.5px;color:#64748B; }
+
+    /* ── 13. Request Journey ────────────────────────────── */
+    .journey-req { background:#F8FAFC; flex:1; display:flex;flex-direction:column;padding:8px;gap:5px; }
+    .field-group { display:flex;flex-direction:column;gap:2px; }
+    .field-label { font-size:5.5px;font-weight:600;color:#64748B; }
+    .field-input {
+      height:16px; border:1.5px solid #CBD5E1; border-radius:5px;
+      background:#fff; padding:0 6px; font-size:6.5px; color:#0F172A;
+      display:flex;align-items:center;
+    }
+    .travel-modes { display:flex;gap:4px; }
+    .mode-chip {
+      flex:1; height:18px; border:1.5px solid #E2E8F0; border-radius:5px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      font-size:7px; background:#fff; gap:1px;
+    }
+    .mode-chip.sel { border-color:#1D61F2; background:#EFF6FF; color:#1D61F2; }
+    .mode-chip .ml { font-size:5px; font-weight:600; }
+
+    /* ── 14. Parent Approval ────────────────────────────── */
+    .approval { background:#F8FAFC; flex:1; display:flex;flex-direction:column;padding:8px;gap:6px; }
+    .approval-card {
+      border:1px solid #E2E8F0; border-radius:8px; background:#fff; padding:6px;
+    }
+    .app-row { display:flex;gap:4px;align-items:center; }
+    .app-ava { width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#1D61F2);font-size:9px;display:flex;align-items:center;justify-content:center; }
+    .app-info .an { font-size:7px;font-weight:700;color:#0F172A; }
+    .app-info .as2 { font-size:5.5px;color:#64748B; }
+    .app-detail { font-size:6px;color:#475569; }
+    .app-detail strong { color:#0F172A;font-weight:700; }
+    .approve-btn { background:#10B981;color:#fff;font-weight:700;font-size:7px;padding:5px;border-radius:6px;text-align:center;width:100%; }
+    .deny-btn { background:#EF4444;color:#fff;font-weight:700;font-size:7px;padding:5px;border-radius:6px;text-align:center;width:100%; }
+
+    /* ── 15. Safety Timeline ────────────────────────────── */
+    .timeline-screen { background:#F8FAFC; flex:1; display:flex;flex-direction:column;padding:8px;gap:5px;overflow:hidden; }
+    .timeline-item { display:flex;gap:5px;align-items:flex-start; }
+    .tl-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:1px; }
+    .tl-line { position:relative; }
+    .tl-line::after { content:'';position:absolute;left:50%;top:10px;width:1.5px;height:16px;background:#E2E8F0;transform:translateX(-50%); }
+    .tl-time { font-size:5.5px;color:#94A3B8;font-weight:600; }
+    .tl-event { font-size:6.5px;font-weight:700;color:#0F172A; }
+    .tl-detail { font-size:5.5px;color:#64748B; }
+
+    /* ── 16. Emergency ──────────────────────────────────── */
+    .emergency-screen { background:#FFF5F5; flex:1; display:flex;flex-direction:column;align-items:center;padding:10px;gap:7px; }
+    .sos-ring {
+      width:52px;height:52px;border-radius:50%;
+      background:radial-gradient(circle,#EF4444 40%,#DC2626 70%,#B91C1C 100%);
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-size:13px;font-weight:900;
+      box-shadow:0 0 0 6px rgba(239,68,68,.2),0 0 0 12px rgba(239,68,68,.1);
+      animation:sosPulse 1.5s ease-in-out infinite;
+    }
+    @keyframes sosPulse {
+      0%,100%{ box-shadow:0 0 0 4px rgba(239,68,68,.25),0 0 0 8px rgba(239,68,68,.1); }
+      50%    { box-shadow:0 0 0 8px rgba(239,68,68,.3),0 0 0 16px rgba(239,68,68,.08); }
+    }
+    .sos-hold { font-size:6px;color:#EF4444;font-weight:600;text-align:center; }
+    .emer-btn {
+      width:100%;height:16px;border:1.5px solid #E2E8F0;border-radius:6px;
+      background:#fff;display:flex;align-items:center;gap:4px;padding:0 6px;
+      font-size:6.5px;font-weight:600;color:#0F172A;
+    }
+    .emer-btn.danger { border-color:#FECACA;background:#FEF2F2;color:#EF4444; }
+
+    /* ── 17. Settings ───────────────────────────────────── */
+    .settings-screen { background:#F8FAFC; flex:1; display:flex;flex-direction:column;padding:8px;gap:4px;overflow:hidden; }
+    .settings-group { background:#fff;border-radius:8px;overflow:hidden;border:1px solid #F1F5F9; }
+    .settings-row {
+      display:flex;align-items:center;justify-content:space-between;
+      padding:5px 7px; border-bottom:1px solid #F8FAFC;
+    }
+    .settings-row:last-child { border-bottom:none; }
+    .settings-row .sr-left { display:flex;align-items:center;gap:5px; }
+    .settings-row .sr-icon { font-size:9px; }
+    .settings-row .sr-text { font-size:6.5px;font-weight:600;color:#0F172A; }
+    .settings-row .sr-arrow { font-size:6px;color:#94A3B8; }
+    .mini-toggle {
+      width:18px;height:10px;border-radius:5px;background:#10B981;
+      display:flex;align-items:center;padding:1px 1px 1px 8px;
+    }
+    .mini-toggle-dot { width:8px;height:8px;border-radius:50%;background:#fff; }
+
+    /* ── 18. Demo Simulator ─────────────────────────────── */
+    .demo-screen { background:#F8FAFC; flex:1; display:flex;flex-direction:column;padding:8px;gap:5px; }
+    .demo-hero { background:linear-gradient(135deg,#6366F1 0%,#1D61F2 100%);border-radius:8px;padding:8px;text-align:center; }
+    .demo-hero h4 { font-size:8px;font-weight:800;color:#fff; }
+    .demo-hero p { font-size:5.5px;color:rgba(255,255,255,.8); }
+    .demo-item { display:flex;align-items:center;gap:4px;font-size:6px;color:#475569; }
+    .demo-item .di { width:7px;height:7px;border-radius:50%;background:#10B981;flex-shrink:0; }
+    .start-demo { background:#1D61F2;color:#fff;font-weight:700;font-size:7.5px;padding:6px;border-radius:6px;text-align:center;width:100%;margin-top:auto; }
+
+    /* ── 19. Journey Live ───────────────────────────────── */
+    .live-screen { background:#F1F5F9; flex:1; display:flex;flex-direction:column;overflow:hidden; }
+    .live-map { flex:1;background:linear-gradient(180deg,#BFDBFE,#93C5FD);position:relative; }
+    .live-progress-card {
+      background:#fff;padding:6px 8px;border-top:1px solid #E2E8F0;
+      display:flex;flex-direction:column;gap:4px;
+    }
+    .progress-bar { height:4px;background:#E2E8F0;border-radius:2px;overflow:hidden; }
+    .progress-fill { height:100%;background:linear-gradient(90deg,#1D61F2,#10B981);width:45%; border-radius:2px; }
+    .live-stats { display:flex;justify-content:space-between; }
+    .live-stat .lv { font-size:7px;font-weight:700;color:#0F172A; }
+    .live-stat .ll { font-size:5px;color:#64748B; }
+    .end-journey-btn { background:#EF4444;color:#fff;font-weight:700;font-size:6.5px;padding:5px;border-radius:6px;text-align:center; }
+
+    /* ── 20. Safe Zones ─────────────────────────────────── */
+    .zones-screen { background:#F8FAFC; flex:1; display:flex;flex-direction:column;padding:8px;gap:5px; }
+    .zone-card {
+      display:flex;align-items:center;gap:5px;
+      background:#fff;border:1px solid #E2E8F0;border-radius:7px;padding:5px 7px;
+    }
+    .zone-icon-circle {
+      width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;
+    }
+    .zone-card .zn { font-size:6.5px;font-weight:700;color:#0F172A; }
+    .zone-card .zr { font-size:5.5px;color:#64748B; }
+    .zone-status { margin-left:auto; font-size:5.5px;font-weight:700;padding:2px 5px;border-radius:var(--radius-full); }
+    .zone-status.ok { background:#F0FDF4;color:#10B981; }
+    .add-zone { background:#1D61F2;color:#fff;font-weight:700;font-size:6.5px;padding:5px;border-radius:6px;text-align:center;margin-top:auto; }
+
+    /* ── 21. Family Members ─────────────────────────────── */
+    .members-screen { background:#F8FAFC; flex:1; display:flex;flex-direction:column;padding:8px;gap:5px; }
+    .member-card {
+      display:flex;align-items:center;gap:5px;
+      background:#fff;border:1px solid #E2E8F0;border-radius:7px;padding:5px 7px;
+    }
+    .member-ava { width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px; }
+    .member-info .mn { font-size:7px;font-weight:700;color:#0F172A; }
+    .member-info .mr { font-size:5.5px;color:#64748B; }
+    .member-badge { margin-left:auto;font-size:5px;padding:2px 6px;border-radius:var(--radius-full);font-weight:700; }
+    .member-badge.parent { background:#EFF6FF;color:#1D61F2; }
+    .member-badge.student { background:#F0FDF4;color:#059669; }
+    .invite-btn { border:1.5px dashed #CBD5E1;background:transparent;color:#64748B;font-size:6.5px;padding:5px;border-radius:6px;text-align:center;margin-top:auto; }
+
+    /* ── 22. Profile / Splash end ───────────────────────── */
+    .profile-screen { background:#F8FAFC; flex:1; display:flex;flex-direction:column;padding:8px;gap:6px; }
+    .profile-hero { display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0; }
+    .profile-ava-lg { width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#1D61F2);display:flex;align-items:center;justify-content:center;font-size:18px; }
+    .profile-name { font-size:9px;font-weight:800;color:#0F172A; }
+    .profile-id { font-size:6px;color:#6366F1;font-weight:600; }
+
+    /* ══════════════════════════════════════════════════════
+       FEATURE DETAIL CARDS (below gallery)
+    ══════════════════════════════════════════════════════ */
+    .features-section { padding: 60px 24px; background: #1E293B; }
+    .features-inner { max-width: 1200px; margin: 0 auto; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px,1fr));
+      gap: 20px;
+      margin-top: 40px;
+    }
+    .feature-card {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      transition: transform .2s, border-color .2s;
+    }
+    .feature-card:hover { transform: translateY(-3px); border-color: rgba(99,179,237,.3); }
+    .fc-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 16px;
+    }
+    .fc-title { font-size: 16px; font-weight: 700; color: #F8FAFC; margin-bottom: 8px; }
+    .fc-desc  { font-size: 13px; color: #94A3B8; line-height: 1.6; }
+
+    /* ══════════════════════════════════════════════════════
+       FLOW DIAGRAM
+    ══════════════════════════════════════════════════════ */
+    .flow-section { padding: 60px 24px; background: #0F172A; }
+    .flow-inner { max-width: 960px; margin: 0 auto; }
+    .flow-steps {
+      display: flex; flex-wrap: wrap; gap: 0;
+      justify-content: center; margin-top: 40px;
+    }
+    .flow-step {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      flex: 0 0 140px; position: relative;
+    }
+    .flow-step:not(:last-child)::after {
+      content: '→';
+      position: absolute;
+      right: -12px; top: 18px;
+      color: #38BDF8; font-size: 14px; font-weight: 700;
+    }
+    @media(max-width:600px) {
+      .flow-step:not(:last-child)::after { content: '↓'; right: auto; bottom: -18px; top: auto; }
+      .flow-steps { flex-direction: column; align-items: center; gap: 28px; }
+      .flow-step::after { right: auto !important; }
+    }
+    .flow-circle {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: linear-gradient(135deg,#1D61F2,#6366F1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 0 6px rgba(29,97,242,.15);
+    }
+    .flow-label { font-size: 11px; font-weight: 600; color: #94A3B8; text-align: center; }
+
+    /* ══════════════════════════════════════════════════════
+       TECH STACK
+    ══════════════════════════════════════════════════════ */
+    .tech-section { padding: 60px 24px; background: #1E293B; }
+    .tech-inner { max-width: 1000px; margin: 0 auto; }
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px,1fr));
+      gap: 12px; margin-top: 36px;
+    }
+    .tech-pill {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 600; color: #CBD5E1; text-align: center;
+    }
+    .tech-pill .te { font-size: 24px; }
+
+    /* ══════════════════════════════════════════════════════
+       RESPONSIVE PREVIEW SECTION (tablet / desktop mockup)
+    ══════════════════════════════════════════════════════ */
+    .responsive-section { padding: 60px 24px; background: #0F172A; }
+    .responsive-inner { max-width: 1100px; margin: 0 auto; }
+    .device-showcase {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 32px; margin-top: 40px;
+    }
+    @media(min-width:768px) { .device-showcase { grid-template-columns: 1fr 1fr; } }
+    @media(min-width:1024px) { .device-showcase { grid-template-columns: 1fr 1fr 1fr; } }
+
+    .device-frame {
+      background: #1E293B;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .device-label { font-size: 11px; font-weight: 600; color: #64748B; letter-spacing: .5px; text-transform: uppercase; }
+
+    /* tablet */
+    .tablet-frame {
+      width: 100%; max-width: 340px;
+      aspect-ratio: 4/3;
+      background: #F1F5F9;
+      border-radius: 12px;
+      border: 6px solid #334155;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    }
+    .tablet-screen { width:100%; height:100%; display:flex; }
+    .tablet-sidebar { width:80px; background:#fff; border-right:1px solid #F1F5F9; display:flex;flex-direction:column;gap:3px;padding:8px 4px; }
+    .tablet-nav-item { display:flex;align-items:center;gap:4px;padding:4px 5px;border-radius:6px; }
+    .tablet-nav-item.active { background:#EFF6FF; }
+    .tablet-nav-item .tni { font-size:9px; }
+    .tablet-nav-item .tnl { font-size:6px;font-weight:600;color:#475569; }
+    .tablet-nav-item.active .tnl { color:#1D61F2; }
+    .tablet-content { flex:1; background:#F8FAFC; padding:8px; display:flex;flex-direction:column;gap:5px; }
+
+    /* desktop */
+    .desktop-frame {
+      width:100%; max-width:420px;
+      aspect-ratio:16/9;
+      background:#F1F5F9;
+      border-radius:10px;
+      border:6px solid #334155;
+      overflow:hidden;
+      box-shadow:0 8px 32px rgba(0,0,0,.4);
+    }
+    .desktop-screen { width:100%;height:100%;display:flex;flex-direction:column; }
+    .desktop-topbar {
+      background:#fff;height:18px;border-bottom:1px solid #F1F5F9;
+      display:flex;align-items:center;justify-content:space-between;padding:0 8px;
+    }
+    .desktop-main { flex:1;display:flex; }
+    .desktop-sidebar { width:90px;background:#0F172A;display:flex;flex-direction:column;gap:2px;padding:6px 4px; }
+    .desktop-nav { display:flex;align-items:center;gap:3px;padding:4px;border-radius:5px;color:#94A3B8;font-size:5px; }
+    .desktop-nav.active { background:rgba(29,97,242,.2);color:#38BDF8; }
+    .desktop-content { flex:1;background:#F8FAFC;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px; }
+    .dc-card { background:#fff;border-radius:5px;border:1px solid #F1F5F9;padding:4px;display:flex;flex-direction:column;gap:2px; }
+    .dc-title { font-size:5px;font-weight:700;color:#0F172A; }
+    .dc-value { font-size:8px;font-weight:800;color:#1D61F2; }
+    .dc-sub { font-size:4.5px;color:#64748B; }
+
+    /* ══════════════════════════════════════════════════════
+       FOOTER / CTA
+    ══════════════════════════════════════════════════════ */
+    .cta-section {
+      padding: 80px 24px;
+      background: linear-gradient(160deg,#1E293B,#0F172A);
+      text-align: center;
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+    .cta-title { font-size:clamp(24px,4vw,40px); font-weight:800; color:#F8FAFC; margin-bottom:12px; }
+    .cta-title span { color:#38BDF8; }
+    .cta-sub { font-size:15px; color:#94A3B8; margin-bottom:32px; max-width:520px; margin-left:auto; margin-right:auto; }
+    footer {
+      padding: 24px;
+      text-align: center;
+      font-size: 12px;
+      color: #475569;
+      border-top: 1px solid rgba(255,255,255,.05);
+    }
+    footer span { color: #94A3B8; }
+
+    /* ══════════════════════════════════════════════════════
+       LOADING OVERLAY (page-level demo)
+    ══════════════════════════════════════════════════════ */
+    #page-loader {
+      position:fixed; inset:0; background:#0F172A;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:24px; z-index:99999; transition:opacity .5s;
+    }
+    #page-loader.hide { opacity:0; pointer-events:none; }
+    .loader-logo {
+      width:64px;height:64px;background:linear-gradient(135deg,#6366F1,#1D61F2);
+      border-radius:20px;display:flex;align-items:center;justify-content:center;
+      font-size:32px;animation:logoFloat 2s ease-in-out infinite;
+    }
+    .loader-ring { width:48px;height:48px;position:relative; }
+    .loader-ring span {
+      position:absolute;width:6px;height:6px;border-radius:50%;
+      background:#6366F1;left:50%;top:50%;transform-origin:0 0;
+    }
+    .loader-text { font-size:14px;font-weight:600;color:#94A3B8;font-style:italic; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-track { background:#0F172A; }
+    ::-webkit-scrollbar-thumb { background:#334155;border-radius:3px; }
+    ::-webkit-scrollbar-thumb:hover { background:#475569; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-800 min-h-screen flex flex-col items-center py-4 px-2 sm:px-6">
+<body>
 
-  <!-- TOP CENTER BRANDED LOADING & TELEMETRY INDICATOR (Apple Dynamic Island / Uber Safety Inspired) -->
-  <aside class="fixed top-2 z-50 flex items-center justify-center pointer-events-none" aria-label="SafeSphere Telemetry Sync">
-    <div id="top-branded-pill" class="pointer-events-auto shadow-2xl rounded-full bg-slate-950/95 backdrop-blur-xl border border-sky-400/40 px-3.5 py-1.5 flex items-center gap-2.5 relative overflow-hidden h-9 transition-all duration-300">
-      
-      <!-- Active Orbital Radar Arc (shown when syncing / loading) -->
-      <div id="radar-spinner" class="hidden w-4 h-4 relative flex items-center justify-center">
-        <svg class="animate-spin-radar w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-          <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
+<!-- ════════════════════════════════════════════════════
+     PAGE LOADING OVERLAY
+════════════════════════════════════════════════════ -->
+<div id="page-loader" aria-label="Loading SafeSphere" role="status">
+  <div class="loader-logo">🛡️</div>
+  <div class="loader-ring" id="loader-ring"></div>
+  <div class="loader-text">Your family's safety is our priority…</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     TOP-CENTER LOADING PILL (persists throughout page)
+════════════════════════════════════════════════════ -->
+<div id="loading-pill-wrap" aria-live="polite">
+  <div id="loading-pill">
+    <div class="dot-ring" id="top-dot-ring" aria-hidden="true"></div>
+    <span id="pill-label">Syncing family data…</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     HERO
+════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-badge">
+    <span>🛡️</span> Consent-Based Family Safety
+  </div>
+  <div class="hero-logo">🌟</div>
+  <h1>SafeSphere <span>Family</span></h1>
+  <p class="hero-tagline">"Verify. Monitor. Protect."</p>
+  <div class="hero-actions">
+    <button class="btn-primary" onclick="triggerLoadDemo()">▶ View Live Demo</button>
+    <button class="btn-outline">📄 Download APK</button>
+  </div>
+</section>
+
+<!-- FEATURE STRIP -->
+<div class="feature-strip" role="list">
+  <div class="feat-chip" role="listitem"><span class="icon">✈️</span>Travel Approval</div>
+  <div class="feat-chip" role="listitem"><span class="icon">🎯</span>Driver Verification</div>
+  <div class="feat-chip" role="listitem"><span class="icon">📍</span>Live Tracking</div>
+  <div class="feat-chip" role="listitem"><span class="icon">🏠</span>Safe Zones</div>
+  <div class="feat-chip" role="listitem"><span class="icon">🔔</span>Boundary Alerts</div>
+  <div class="feat-chip" role="listitem"><span class="icon">🔑</span>Emergency Keys</div>
+  <div class="feat-chip" role="listitem"><span class="icon">📷</span>Camera Check</div>
+  <div class="feat-chip" role="listitem"><span class="icon">💬</span>I'm OK (WhatsApp)</div>
+  <div class="feat-chip" role="listitem"><span class="icon">📋</span>Safety Timeline</div>
+  <div class="feat-chip" role="listitem"><span class="icon">📘</span>Parent Guide PDF</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN GALLERY
+════════════════════════════════════════════════════ -->
+<section class="section" style="background:#0F172A;" id="screens">
+  <div class="section-inner">
+    <span class="section-label">UI Screens</span>
+    <h2 class="section-title">22 Fully Designed Screens</h2>
+    <p class="section-subtitle">Every screen is built for clarity, consent, and mobile-first usability — from splash to safety timeline.</p>
+
+    <div class="screens-grid" role="list">
+
+      <!-- 1. Splash -->
+      <div class="phone-card" role="listitem" aria-label="Splash Screen">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="splash-screen">
+              <div class="splash-logo-circle">🌟</div>
+              <div class="splash-name">SafeSphere</div>
+              <div class="splash-sub">Family</div>
+              <div class="splash-tag">Verify. Monitor. Protect.</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">1. Splash Screen</span>
       </div>
 
-      <!-- Idle Steady Green Security Beacon (shown when idle) -->
-      <div id="idle-beacon" class="flex items-center justify-center relative w-3.5 h-3.5">
-        <span class="w-3.5 h-3.5 rounded-full bg-emerald-400/30 animate-pulse-glow absolute"></span>
-        <span class="w-2 h-2 rounded-full bg-emerald-400 relative z-10 shadow-sm"></span>
+      <!-- 2. Loading -->
+      <div class="phone-card" role="listitem" aria-label="Loading Screen">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="loading-screen">
+              <div class="loading-logo-small">🌟</div>
+              <div class="mini-dot-ring" id="screen-loader-2"></div>
+              <div class="loading-tagline">Your family's safety<br>is our priority…</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">2. Loading Screen</span>
       </div>
 
-      <!-- Live Dynamic Label -->
-      <span class="relative z-10 text-[11px] font-semibold text-slate-100 tracking-wide" id="top-loading-status-label">All Protections Armed</span>
-
-      <!-- Fast Sync Action Button -->
-      <button class="relative z-10 text-[9px] font-bold text-sky-400 bg-sky-950 hover:bg-sky-900 border border-sky-500/40 px-2 py-0.5 rounded-full transition-all active:scale-95" onclick="triggerFastSync()">SYNC</button>
-
-      <!-- Bottom Micro Glowing Shimmer Line -->
-      <div id="shimmer-bar" class="hidden absolute bottom-0 left-0 right-0 h-[2px] bg-slate-800 overflow-hidden">
-        <div class="w-1/2 h-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-shimmer"></div>
+      <!-- 3. Consent -->
+      <div class="phone-card" role="listitem" aria-label="Consent Notice">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="consent-screen">
+              <div class="consent-title">Family Safety &amp; Consent Notice</div>
+              <div class="consent-sub">SafeSphere contains sensitive features including:</div>
+              <div class="consent-item"><span class="dot"></span>Location sharing</div>
+              <div class="consent-item"><span class="dot"></span>Journey monitoring</div>
+              <div class="consent-item"><span class="dot"></span>Geofence alerts</div>
+              <div class="consent-item"><span class="dot"></span>Camera-based verification</div>
+              <div class="consent-item"><span class="dot"></span>Emergency alerts</div>
+              <div class="consent-item"><span class="dot"></span>Driver identity verification</div>
+              <div class="consent-warn">⚠️ Parents/guardians must obtain student knowledge &amp; consent before using monitoring features.</div>
+              <div class="consent-check"><input type="checkbox" id="ck" checked/><label for="ck" style="font-size:6px">I understand</label></div>
+              <div class="mini-btn">CONTINUE</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">3. Consent Notice</span>
       </div>
-    </div>
-  </aside>
 
-  <!-- SECURITY ACCESS DENIED MODAL -->
-  <div id="access-denied-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl flex flex-col items-center text-center gap-3 border border-red-100 animate-in fade-in zoom-in-95">
-      <div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center text-2xl shadow-inner">🔒</div>
-      <h3 class="text-base font-bold text-slate-900">Security Access Restricted</h3>
-      <p class="text-xs text-slate-600 leading-relaxed" id="access-denied-message">Students cannot access the Parent Dashboard. Role separation is strictly enforced.</p>
-      <button class="w-full mt-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95" onclick="closeAccessDeniedModal()">Acknowledge</button>
+      <!-- 4. Phone Verify -->
+      <div class="phone-card" role="listitem" aria-label="Phone Verification">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="phone-screen-ui">
+              <div class="back-row"><div class="back-icon">‹</div></div>
+              <div class="screen-heading">Phone Verification</div>
+              <div class="screen-subhead">Enter your mobile number to get started</div>
+              <div class="mini-input"><span class="flag">🇮🇳</span><span style="color:#94A3B8">+91</span><span class="mini-input-text" style="flex:1;padding-left:3px;">Enter phone number</span></div>
+              <div class="mini-btn">SEND OTP</div>
+              <div class="mini-small-text">By continuing, you agree to our Privacy Policy and Terms of Service.</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">4. Phone Verify</span>
+      </div>
+
+      <!-- 5. OTP -->
+      <div class="phone-card" role="listitem" aria-label="OTP Verification">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="phone-screen-ui">
+              <div class="back-row"><div class="back-icon">‹</div></div>
+              <div class="screen-heading">Verify OTP</div>
+              <div class="screen-subhead">Enter the 6-digit code sent to +91 98765 43210</div>
+              <div class="otp-boxes">
+                <div class="otp-box filled">1</div>
+                <div class="otp-box filled">2</div>
+                <div class="otp-box filled">3</div>
+                <div class="otp-box">_</div>
+                <div class="otp-box">_</div>
+                <div class="otp-box">_</div>
+              </div>
+              <div class="resend-text">Resend OTP (00:48)</div>
+              <div class="mini-btn" style="margin-top:4px">VERIFY</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">5. OTP Verification</span>
+      </div>
+
+      <!-- 6. Choose Role -->
+      <div class="phone-card" role="listitem" aria-label="Choose Role">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="phone-screen-ui">
+              <div class="back-row"><div class="back-icon">‹</div></div>
+              <div class="screen-heading">Choose Your Role</div>
+              <div class="screen-subhead">Are you a parent/guardian or a student?</div>
+              <div class="role-card selected">
+                <div class="role-icon parent">👨‍👩‍👧</div>
+                <div class="role-text"><h4>Parent / Guardian</h4><p>Monitor and keep your family safe</p></div>
+              </div>
+              <div class="role-card" style="margin-top:5px">
+                <div class="role-icon student">🎒</div>
+                <div class="role-text"><h4>Student</h4><p>Get safety support and share your journey</p></div>
+              </div>
+              <div class="mini-btn" style="margin-top:8px">CONTINUE</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">6. Choose Role</span>
+      </div>
+
+      <!-- 7. Create ID -->
+      <div class="phone-card" role="listitem" aria-label="Create SafeSphere ID">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="form-screen">
+              <div class="back-row"><div class="back-icon">‹</div></div>
+              <div class="screen-heading">Create SafeSphere ID</div>
+              <div class="screen-subhead">Choose a unique ID for your account</div>
+              <div class="mini-input"><span style="font-size:7px">👤</span><span class="mini-input-text">safefamily123</span></div>
+              <div style="display:flex;align-items:center;gap:3px;font-size:6px;color:#10B981">✅ ID available</div>
+              <div class="mini-btn" style="margin-top:auto">CONTINUE</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">7. Create ID (Step 4)</span>
+      </div>
+
+      <!-- 8. Password -->
+      <div class="phone-card" role="listitem" aria-label="Create Password">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="form-screen">
+              <div class="back-row"><div class="back-icon">‹</div></div>
+              <div class="screen-heading">Create Password</div>
+              <div class="screen-subhead">Use a strong password for security</div>
+              <div class="mini-input"><span style="font-size:7px">🔒</span><span class="mini-input-text">●●●●●●●●●</span></div>
+              <div class="pw-check"><span class="x">✓</span>At least 8 characters</div>
+              <div class="pw-check"><span class="x">✓</span>One uppercase letter</div>
+              <div class="pw-check"><span class="x">✓</span>One number</div>
+              <div class="pw-check"><span class="x">✓</span>One special character</div>
+              <div class="mini-btn" style="margin-top:auto">CONTINUE</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">8. Create Password</span>
+      </div>
+
+      <!-- 9. Complete Profile -->
+      <div class="phone-card" role="listitem" aria-label="Create Profile">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="form-screen">
+              <div class="back-row"><div class="back-icon">‹</div></div>
+              <div class="screen-heading" style="font-size:9px">Complete Your Profile</div>
+              <div class="avatar-circle">👤</div>
+              <div class="field-group">
+                <div class="mini-label">Full Name</div>
+                <div class="field-input">John Doe</div>
+              </div>
+              <div class="field-group">
+                <div class="mini-label">Role</div>
+                <div class="field-input">Student ▾</div>
+              </div>
+              <div class="field-group">
+                <div class="mini-label">Grade / Class</div>
+                <div class="field-input">10th Grade</div>
+              </div>
+              <div class="mini-btn" style="margin-top:auto">CREATE ACCOUNT</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">9. Create Profile</span>
+      </div>
+
+      <!-- 10. Parent Dashboard -->
+      <div class="phone-card" role="listitem" aria-label="Parent Dashboard">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="parent-dash">
+              <div class="dash-header">
+                <div>
+                  <div class="dash-greeting">Good Morning, Sarah (Parent)</div>
+                  <div class="dash-sub">3 family members active</div>
+                </div>
+                <div class="notification-dot">🔔</div>
+              </div>
+              <div class="family-status-pill">
+                <span class="status-icon-sm">🛡️</span>
+                <span class="status-text">Your family is safe</span>
+              </div>
+              <div style="padding:0 8px;font-size:6px;font-weight:700;color:#0F172A;margin-bottom:2px">Family Members</div>
+              <div class="student-mini-card">
+                <div class="stu-ava">A</div>
+                <div class="stu-info">
+                  <div class="stu-name">Alex (Student)</div>
+                  <div class="stu-status">On trip · 2h 15m</div>
+                </div>
+                <div class="view-btn">VIEW</div>
+              </div>
+              <div class="dash-qa-title">Quick Actions</div>
+              <div class="qa-grid">
+                <div class="qa-btn"><span class="qi">📍</span><span class="ql">Request Location</span></div>
+                <div class="qa-btn"><span class="qi">🏠</span><span class="ql">Safe Zone</span></div>
+                <div class="qa-btn"><span class="qi">🚨</span><span class="ql">Emergency</span></div>
+                <div class="qa-btn"><span class="qi">⚙️</span><span class="ql">Settings</span></div>
+              </div>
+              <div class="bottom-nav-mini">
+                <div class="bn-item"><div class="bn-icon active">🏠</div><div class="bn-text active">Home</div></div>
+                <div class="bn-item"><div class="bn-icon">👨‍👩‍👧</div><div class="bn-text">Family</div></div>
+                <div class="bn-item"><div class="bn-icon">🗺️</div><div class="bn-text">Map</div></div>
+                <div class="bn-item"><div class="bn-icon">⋯</div><div class="bn-text">More</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">10. Parent Dashboard</span>
+      </div>
+
+      <!-- 11. Student Dashboard -->
+      <div class="phone-card" role="listitem" aria-label="Student Dashboard">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="stu-dash">
+              <div class="dash-header">
+                <div>
+                  <div class="dash-greeting">Hi Alex! 👋</div>
+                  <div class="dash-sub">Stay safe. You've got this!</div>
+                </div>
+                <span class="active-badge">Active</span>
+              </div>
+              <div style="background:#EFF6FF;margin:5px 8px;border-radius:7px;padding:5px 7px;">
+                <div style="font-size:6.5px;font-weight:700;color:#1D4ED8">Journey Active</div>
+                <div style="font-size:5.5px;color:#64748B">School → Home · Ends in 1h 20m</div>
+              </div>
+              <div class="stu-status-section">
+                <div class="stu-status-chip"><span class="cs-dot"></span><span class="cs-text">Inside College Zone</span></div>
+                <div class="stu-status-chip"><span class="cs-dot"></span><span class="cs-text">No active journey</span></div>
+                <div class="stu-status-chip"><span class="cs-dot"></span><span class="cs-text">Family connected</span></div>
+              </div>
+              <div class="qa-grid" style="padding:0 8px;">
+                <div class="qa-btn"><span class="qi">🚀</span><span class="ql">Start Journey</span></div>
+                <div class="qa-btn"><span class="qi">🔒</span><span class="ql">Safe Zones</span></div>
+                <div class="qa-btn"><span class="qi">✅</span><span class="ql">I'm OK</span></div>
+                <div class="qa-btn"><span class="qi">🚨</span><span class="ql">Emergency</span></div>
+              </div>
+              <div class="bottom-nav-mini">
+                <div class="bn-item"><div class="bn-icon active">🏠</div><div class="bn-text active">Home</div></div>
+                <div class="bn-item"><div class="bn-icon">🚗</div><div class="bn-text">Journey</div></div>
+                <div class="bn-item"><div class="bn-icon">🗺️</div><div class="bn-text">Map</div></div>
+                <div class="bn-item"><div class="bn-icon">⋯</div><div class="bn-text">More</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">11. Student Dashboard</span>
+      </div>
+
+      <!-- 12. Family Map -->
+      <div class="phone-card" role="listitem" aria-label="Family Map">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="map-screen">
+              <div class="map-header">
+                <div class="back-icon">‹</div>
+                <div style="font-size:8px;font-weight:800;color:#0F172A">Family Map</div>
+              </div>
+              <div class="map-body">
+                <div class="map-overlay">
+                  <div class="fake-road" style="top:30%;left:0;right:0;height:3px;transform:rotate(-5deg)"></div>
+                  <div class="fake-road" style="top:60%;left:0;right:0;height:2px"></div>
+                  <div class="fake-road" style="left:35%;top:0;bottom:0;width:2px;transform:rotate(5deg)"></div>
+                </div>
+                <div class="map-route"></div>
+                <div class="map-pin" style="top:22%;left:30%">📍</div>
+                <div class="map-pin" style="top:55%;left:48%">🏠</div>
+                <div class="map-pin" style="top:38%;left:40%">👤</div>
+                <div class="map-info-card">
+                  <div class="map-ava">A</div>
+                  <div class="map-info">
+                    <div class="t">Alex – on the way to Home</div>
+                    <div class="s">ETA 12 min · 2.4 km</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">12. Family Map</span>
+      </div>
+
+      <!-- 13. Request Journey -->
+      <div class="phone-card" role="listitem" aria-label="Request Journey">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="journey-req">
+              <div class="back-row"><div class="back-icon">‹</div><span style="font-size:8px;font-weight:800;color:#0F172A;margin-left:2px">Request Journey</span></div>
+              <div class="field-group"><div class="field-label">From</div><div class="field-input">School</div></div>
+              <div class="field-group"><div class="field-label">To</div><div class="field-input">Home</div></div>
+              <div class="field-label">Travel Mode</div>
+              <div class="travel-modes">
+                <div class="mode-chip sel">🚗<span class="ml">Car</span></div>
+                <div class="mode-chip">🚌<span class="ml">Bus</span></div>
+                <div class="mode-chip">🚶<span class="ml">Walk</span></div>
+              </div>
+              <div class="field-group"><div class="field-label">Expected Arrival</div><div class="field-input">12 Sep 2025 · 3:00 PM</div></div>
+              <div class="mini-btn">SEND REQUEST</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">13. Request Journey</span>
+      </div>
+
+      <!-- 14. Parent Approval -->
+      <div class="phone-card" role="listitem" aria-label="Parent Approval">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="approval">
+              <div class="back-row"><div class="back-icon">‹</div><span style="font-size:8px;font-weight:800;color:#0F172A;margin-left:2px">Journey Request</span></div>
+              <div class="approval-card">
+                <div class="app-row">
+                  <div class="app-ava">A</div>
+                  <div class="app-info">
+                    <div class="an">Alex (Student)</div>
+                    <div class="as2">School → Home · Expected arrival: 5:00 PM</div>
+                  </div>
+                </div>
+                <div class="app-detail" style="margin-top:5px">Alex has requested to start their journey. Please approve or deny.</div>
+              </div>
+              <div class="approve-btn">APPROVE</div>
+              <div class="deny-btn">DENY</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">14. Parent Approval</span>
+      </div>
+
+      <!-- 15. Safety Timeline -->
+      <div class="phone-card" role="listitem" aria-label="Safety Timeline">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="timeline-screen">
+              <div class="back-row"><div class="back-icon">‹</div><span style="font-size:8px;font-weight:800;color:#0F172A;margin-left:2px">Safety Timeline</span></div>
+              <div class="timeline-item tl-line"><div class="tl-dot" style="background:#1D61F2"></div><div><div class="tl-time">4:12 PM</div><div class="tl-event">Journey Started</div><div class="tl-detail">School</div></div></div>
+              <div class="timeline-item tl-line"><div class="tl-dot" style="background:#6366F1"></div><div><div class="tl-time">4:15 PM</div><div class="tl-event">Location Shared</div><div class="tl-detail">Active</div></div></div>
+              <div class="timeline-item tl-line"><div class="tl-dot" style="background:#10B981"></div><div><div class="tl-time">4:32 PM</div><div class="tl-event">Safe Zone Entered</div><div class="tl-detail">Home (Zone)</div></div></div>
+              <div class="timeline-item tl-line"><div class="tl-dot" style="background:#F59E0B"></div><div><div class="tl-time">4:45 PM</div><div class="tl-event">Camera Check</div><div class="tl-detail">Verified ✓</div></div></div>
+              <div class="timeline-item"><div class="tl-dot" style="background:#10B981"></div><div><div class="tl-time">5:00 PM</div><div class="tl-event">Journey Completed</div><div class="tl-detail">Arrived Home ✓</div></div></div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">15. Safety Timeline</span>
+      </div>
+
+      <!-- 16. Emergency -->
+      <div class="phone-card" role="listitem" aria-label="Emergency Screen">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="emergency-screen">
+              <div style="font-size:8px;font-weight:800;color:#DC2626">Emergency</div>
+              <div class="sos-ring">SOS</div>
+              <div class="sos-hold">Press and hold for emergency</div>
+              <div class="emer-btn">📍 Share Location</div>
+              <div class="emer-btn">📞 Call Trusted Contact</div>
+              <div class="emer-btn">👨‍👩‍👧 Notify Parents</div>
+              <div class="emer-btn danger">🔐 Emergency PIN<br><span style="font-size:5px;font-weight:400">Tap to enter</span></div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">16. Emergency</span>
+      </div>
+
+      <!-- 17. Settings -->
+      <div class="phone-card" role="listitem" aria-label="Settings Screen">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="settings-screen">
+              <div style="font-size:8px;font-weight:800;color:#0F172A;margin-bottom:3px">Settings</div>
+              <div style="font-size:5.5px;font-weight:700;color:#94A3B8;margin-bottom:2px;letter-spacing:.5px">ACCOUNT</div>
+              <div class="settings-group">
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">👤</span><span class="sr-text">Profile</span></div><span class="sr-arrow">›</span></div>
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">👨‍👩‍👧</span><span class="sr-text">Family Members</span></div><span class="sr-arrow">›</span></div>
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">🛡️</span><span class="sr-text">SafeSphere ID</span></div><span class="sr-arrow">›</span></div>
+              </div>
+              <div style="font-size:5.5px;font-weight:700;color:#94A3B8;margin:4px 0 2px;letter-spacing:.5px">SAFETY &amp; PRIVACY</div>
+              <div class="settings-group">
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">📍</span><span class="sr-text">Location Sharing</span></div><div class="mini-toggle"><div class="mini-toggle-dot"></div></div></div>
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">📷</span><span class="sr-text">Camera Verification</span></div><div class="mini-toggle"><div class="mini-toggle-dot"></div></div></div>
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">🔔</span><span class="sr-text">Geofence Alerts</span></div><div class="mini-toggle"><div class="mini-toggle-dot"></div></div></div>
+              </div>
+              <div style="font-size:5.5px;font-weight:700;color:#94A3B8;margin:4px 0 2px;letter-spacing:.5px">APPEARANCE</div>
+              <div class="settings-group">
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">🎨</span><span class="sr-text">Theme</span></div><span style="font-size:5.5px;color:#94A3B8">Light ›</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">17. Settings</span>
+      </div>
+
+      <!-- 18. Demo Simulator -->
+      <div class="phone-card" role="listitem" aria-label="Demo Simulator">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="demo-screen">
+              <div class="back-row"><div class="back-icon">‹</div><span style="font-size:8px;font-weight:800;color:#0F172A;margin-left:2px">Demo Simulator</span></div>
+              <div class="demo-hero">
+                <h4>Try SafeSphere</h4>
+                <p>Interactive Demo · Explore key features with simulated data</p>
+              </div>
+              <div class="demo-item"><span class="di"></span>Journey requests &amp; approval</div>
+              <div class="demo-item"><span class="di"></span>Location tracking simulation</div>
+              <div class="demo-item"><span class="di"></span>Emergency alerts demo</div>
+              <div class="demo-item"><span class="di"></span>Safety timeline walkthrough</div>
+              <div class="start-demo">▶  START DEMO</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">18. Demo Simulator</span>
+      </div>
+
+      <!-- 19. Journey Live -->
+      <div class="phone-card" role="listitem" aria-label="Live Journey Tracking">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="live-screen">
+              <div class="map-header">
+                <div class="back-icon">‹</div>
+                <div style="font-size:7px;font-weight:800;color:#0F172A">Journey Tracking</div>
+                <div class="active-badge" style="margin-left:auto">Live</div>
+              </div>
+              <div class="live-map">
+                <div class="map-overlay">
+                  <div class="fake-road" style="top:35%;left:0;right:0;height:2px;transform:rotate(-5deg)"></div>
+                  <div class="fake-road" style="left:40%;top:0;bottom:0;width:2px"></div>
+                </div>
+                <div class="map-route"></div>
+                <div class="map-pin" style="top:25%;left:28%">🏫</div>
+                <div class="map-pin" style="top:45%;left:40%">🔵</div>
+                <div class="map-pin" style="top:60%;left:50%">🏠</div>
+              </div>
+              <div class="live-progress-card">
+                <div style="display:flex;justify-content:space-between;font-size:6.5px;">
+                  <span style="font-weight:700;color:#0F172A">VNRVJIET → Home</span>
+                  <span style="color:#10B981;font-weight:700">On Route ✓</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill"></div></div>
+                <div class="live-stats">
+                  <div class="live-stat"><div class="lv">5.2 km</div><div class="ll">Distance</div></div>
+                  <div class="live-stat"><div class="lv">34 min</div><div class="ll">ETA</div></div>
+                  <div class="live-stat"><div class="lv">78%</div><div class="ll">Battery</div></div>
+                </div>
+                <div class="end-journey-btn">END JOURNEY</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">19. Journey Tracking (Live)</span>
+      </div>
+
+      <!-- 20. Safe Zones -->
+      <div class="phone-card" role="listitem" aria-label="Safe Zones">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="zones-screen">
+              <div class="back-row"><div class="back-icon">‹</div><span style="font-size:8px;font-weight:800;color:#0F172A;margin-left:2px">Safe Zones</span></div>
+              <div class="zone-card"><div class="zone-icon-circle" style="background:#EFF6FF">🏠</div><div><div class="zn">Home</div><div class="zr">School + Home · 300m</div></div><div class="zone-status ok">Inside</div></div>
+              <div class="zone-card"><div class="zone-icon-circle" style="background:#F0FDF4">🏫</div><div><div class="zn">School</div><div class="zr">500m radius</div></div><div class="zone-status" style="background:#F8FAFC;color:#94A3B8">Away</div></div>
+              <div class="zone-card"><div class="zone-icon-circle" style="background:#FFF7ED">📚</div><div><div class="zn">Library</div><div class="zr">Within 1.2 km</div></div><div class="zone-status" style="background:#F8FAFC;color:#94A3B8">Away</div></div>
+              <div class="zone-card"><div class="zone-icon-circle" style="background:#F5F3FF">🏪</div><div><div class="zn">Park</div><div class="zr">Within 0.5 km</div></div><div class="zone-status" style="background:#F8FAFC;color:#94A3B8">Away</div></div>
+              <div class="add-zone">+ ADD SAFE ZONE</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">20. Safe Zones</span>
+      </div>
+
+      <!-- 21. Family Members -->
+      <div class="phone-card" role="listitem" aria-label="Family Members">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="members-screen">
+              <div class="back-row"><div class="back-icon">‹</div><span style="font-size:8px;font-weight:800;color:#0F172A;margin-left:2px">Family Members</span></div>
+              <div class="member-card"><div class="member-ava" style="background:#EFF6FF;font-size:12px">👩</div><div class="member-info"><div class="mn">Sarah (Parent)</div><div class="mr">Primary Guardian</div></div><div class="member-badge parent">Parent</div></div>
+              <div class="member-card"><div class="member-ava" style="background:#F0FDF4;font-size:12px">👦</div><div class="member-info"><div class="mn">Alex (Student)</div><div class="mr">10th Grade</div></div><div class="member-badge student">Student</div></div>
+              <div class="invite-btn">+ INVITE MEMBER</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">21. Family Members</span>
+      </div>
+
+      <!-- 22. Profile -->
+      <div class="phone-card" role="listitem" aria-label="Profile Screen">
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="mini-sb" style="background:transparent;color:#0F172A">9:41<span>●●● 🔋</span></div>
+            <div class="profile-screen">
+              <div class="profile-hero">
+                <div class="profile-ava-lg">A</div>
+                <div class="profile-name">Alex (Student)</div>
+                <div class="profile-id">@safefamily123 · 10th Grade</div>
+              </div>
+              <div class="settings-group">
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">👤</span><span class="sr-text">Account</span></div><span class="sr-arrow">›</span></div>
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">🚗</span><span class="sr-text">Journey History</span></div><span class="sr-arrow">›</span></div>
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">🛡️</span><span class="sr-text">Safety Settings</span></div><span class="sr-arrow">›</span></div>
+                <div class="settings-row"><div class="sr-left"><span class="sr-icon">📱</span><span class="sr-text">Device Permissions</span></div><span class="sr-arrow">›</span></div>
+              </div>
+              <div style="text-align:center;font-size:8px;font-weight:800;color:#6366F1;margin-top:8px">SafeSphere Family</div>
+              <div style="text-align:center;font-size:6px;color:#94A3B8;">A safer tomorrow, together.</div>
+            </div>
+          </div>
+        </div>
+        <span class="phone-label">22. Profile</span>
+      </div>
+
+    </div><!-- /screens-grid -->
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════
+     FEATURES DETAIL
+════════════════════════════════════════════════════ -->
+<section class="features-section" id="features">
+  <div class="features-inner">
+    <span class="section-label">Core Capabilities</span>
+    <h2 class="section-title">Everything a Family Needs — Nothing They Don't</h2>
+    <p class="section-subtitle">Built on consent, transparency, and intelligent monitoring. No hidden tracking. No black-box alerts.</p>
+
+    <div class="features-grid">
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(29,97,242,.15)">✈️</div><div class="fc-title">Consent-Based Travel Approval</div><div class="fc-desc">Student requests solo travel. Parent approves or declines. A SafeSphere gate prevents journey start without approval.</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(239,68,68,.12)">🎯</div><div class="fc-title">Multi-Factor Driver Verification</div><div class="fc-desc">Before every journey: Driver face, ID, vehicle number, and booking reference are all verified via ML Kit + demo database.</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(20,184,166,.12)">📍</div><div class="fc-title">Live Journey Monitoring</div><div class="fc-desc">Real-time GPS tracking with expected vs actual route comparison. Adaptive update intervals for battery efficiency.</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(16,185,129,.12)">🏠</div><div class="fc-title">Context-Aware Safe Zones</div><div class="fc-desc">Geofences with schedule awareness. A college zone exit at 4:12 PM is "Expected". The same at 11:20 AM is "Check Required".</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(245,158,11,.12)">🔑</div><div class="fc-title">Emergency Keys System</div><div class="fc-desc">Normal PIN + secret Duress PIN. Shake gesture trigger. The duress PIN shows normal UI while silently alerting parents.</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(99,102,241,.12)">📷</div><div class="fc-title">Consent-Based Camera Check</div><div class="fc-desc">Parent can request a camera check. Student sees the request and must allow it. Camera never activates remotely.</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(244,63,94,.12)">💬</div><div class="fc-title">I'm OK + WhatsApp Sharing</div><div class="fc-desc">One-tap "I'm OK" creates a timestamped check-in and optionally sends a pre-filled WhatsApp message to parents.</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(29,97,242,.12)">📋</div><div class="fc-title">Explainable Safety Timeline</div><div class="fc-desc">Every event — from journey start to destination arrived — is logged with timestamps, reasons, and actions taken.</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(16,185,129,.12)">⚡</div><div class="fc-title">Multi-Signal Risk Engine</div><div class="fc-desc">Combines route deviation, unexpected stops, check-in silence, and sensor data into clear states: NORMAL → CHECK_REQUIRED → ELEVATED → EMERGENCY.</div></div>
+      <div class="feature-card"><div class="fc-icon" style="background:rgba(139,92,246,.12)">📘</div><div class="fc-title">Auto-Generated Parent Guide PDF</div><div class="fc-desc">One button generates a complete family safety guide. Emergency PINs are hidden by default, shown only after biometric auth.</div></div>
     </div>
   </div>
+</section>
 
-  <!-- HEADER & RESPONSIVE DEVICE CONTROLS -->
-  <header class="w-full max-w-6xl mt-12 mb-3 flex flex-col items-center gap-2.5">
-    <div class="flex items-center justify-between w-full px-2 text-white">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-extrabold text-sm shadow-md">S</div>
-        <div>
-          <h1 class="text-sm font-bold text-slate-100 flex items-center gap-2">
-            SafeSphere Family
-            <span class="text-[10px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full">Multi-Device Preview</span>
-          </h1>
-          <p class="text-[11px] text-slate-400 hidden sm:block">Mobile • Foldable / Tablet • Desktop Viewport Matrix</p>
-        </div>
-      </div>
+<!-- ════════════════════════════════════════════════════
+     CORE FLOW
+════════════════════════════════════════════════════ -->
+<section class="flow-section" id="flow">
+  <div class="flow-inner">
+    <span class="section-label">Core Journey Flow</span>
+    <h2 class="section-title">The SafeSphere Journey</h2>
+    <p class="section-subtitle">From request to destination — every step is consent-based, verified, and explainable.</p>
 
-      <!-- Role Session Switcher Pill -->
-      <div class="flex items-center gap-2 bg-slate-800/90 border border-slate-700 p-1 rounded-2xl shadow-sm">
-        <span class="text-[11px] font-bold text-slate-300 px-2 flex items-center gap-1.5" id="active-role-badge">
-          <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-          Parent Session
-        </span>
-        <button class="text-[10.5px] font-bold bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-xl transition-all shadow-sm active:scale-95" onclick="toggleActiveRole()" id="switch-role-btn">
-          Switch to Student
-        </button>
-      </div>
+    <div class="flow-steps">
+      <div class="flow-step"><div class="flow-circle">📝</div><div class="flow-label">Request</div></div>
+      <div class="flow-step"><div class="flow-circle">✅</div><div class="flow-label">Consent</div></div>
+      <div class="flow-step"><div class="flow-circle">🎯</div><div class="flow-label">Verify Driver</div></div>
+      <div class="flow-step"><div class="flow-circle">🚀</div><div class="flow-label">Start Journey</div></div>
+      <div class="flow-step"><div class="flow-circle">📍</div><div class="flow-label">Monitor</div></div>
+      <div class="flow-step"><div class="flow-circle">🔎</div><div class="flow-label">Understand Deviations</div></div>
+      <div class="flow-step"><div class="flow-circle">💬</div><div class="flow-label">Check-In</div></div>
+      <div class="flow-step"><div class="flow-circle">🏠</div><div class="flow-label">Arrive Safely</div></div>
     </div>
+  </div>
+</section>
 
-    <!-- Scrollable Screen Navigation Tabs with Role Segregation -->
-    <nav class="w-full bg-slate-800/80 backdrop-blur-md p-1.5 rounded-2xl shadow-inner border border-slate-700 flex items-center gap-1 overflow-x-auto no-scrollbar text-xs font-semibold">
-      <button class="screen-tab px-3 py-1.5 rounded-xl bg-blue-600 text-white whitespace-nowrap shadow-sm transition-all" id="tab-parent-dash" onclick="tryNavigate('screen-parent-dash', this, 'PARENT')">Parent Dash</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" id="tab-student-dash" onclick="tryNavigate('screen-student-dash', this, 'STUDENT')">🔒 Student Dash</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-map', this, 'ALL')">Family Map</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" id="tab-parent-approval" onclick="tryNavigate('screen-approval', this, 'PARENT')">Parent Approval</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-request', this, 'ALL')">Request Journey</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-timeline', this, 'ALL')">Timeline</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-emergency', this, 'ALL')">Emergency SOS</button>
-      <button class="screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all" onclick="tryNavigate('screen-settings', this, 'ALL')">Settings</button>
-    </nav>
-  </header>
+<!-- ════════════════════════════════════════════════════
+     RESPONSIVE DEVICE PREVIEW
+════════════════════════════════════════════════════ -->
+<section class="responsive-section" id="responsive">
+  <div class="responsive-inner">
+    <span class="section-label">Responsive Design</span>
+    <h2 class="section-title">Works Across All Screen Sizes</h2>
+    <p class="section-subtitle">Optimized for Android phones, tablets, and web dashboards — layout reflows intelligently without any lag.</p>
 
-  <!-- RESPONSIVE MULTI-DEVICE VIEWPORT CONTAINER (Mobile 380px, Tablet 768px, Desktop 1024px Grid) -->
-  <main class="w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col relative transition-all min-h-[580px]">
+    <div class="device-showcase">
 
-    <!-- ===================== SCREEN: PARENT DASHBOARD ===================== -->
-    <section class="screen-view p-4 sm:p-6 lg:p-8 flex flex-col gap-4" id="screen-parent-dash">
-      <!-- Role Security Header Banner -->
-      <div class="bg-blue-50/90 border border-blue-200/80 p-3 rounded-2xl flex items-center justify-between">
-        <div class="flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-full bg-blue-600/10 text-blue-700 flex items-center justify-center font-bold text-xs">🛡️</div>
-          <div>
-            <span class="text-xs font-bold text-blue-900 block">Parent Account • Governance Mode Active</span>
-            <span class="text-[10px] text-blue-700">Student access strictly prohibited • Geofence &amp; Consent Active</span>
+      <!-- Phone (already shown above, mini summary card) -->
+      <div class="device-frame">
+        <div class="device-label">📱 Mobile (Android)</div>
+        <div class="phone-frame" style="max-width:160px;aspect-ratio:9/19">
+          <div class="phone-screen">
+            <div class="mini-sb">9:41<span>●●● 🔋</span></div>
+            <div class="parent-dash">
+              <div class="dash-header"><div><div class="dash-greeting">Good Morning, Sarah</div><div class="dash-sub">Family is safe</div></div></div>
+              <div class="family-status-pill"><span class="status-icon-sm">🛡️</span><span class="status-text">Your family is safe</span></div>
+              <div class="student-mini-card"><div class="stu-ava">A</div><div class="stu-info"><div class="stu-name">Alex · On trip</div><div class="stu-status">2h 15m · Active</div></div><div class="view-btn">VIEW</div></div>
+              <div class="qa-grid" style="padding:0 8px;margin-top:4px"><div class="qa-btn"><span class="qi">📍</span><span class="ql">Request Location</span></div><div class="qa-btn"><span class="qi">🚨</span><span class="ql">Emergency</span></div><div class="qa-btn"><span class="qi">🏠</span><span class="ql">Safe Zone</span></div><div class="qa-btn"><span class="qi">⚙️</span><span class="ql">Settings</span></div></div>
+              <div class="bottom-nav-mini"><div class="bn-item"><div class="bn-icon active">🏠</div><div class="bn-text active">Home</div></div><div class="bn-item"><div class="bn-icon">👨‍👩‍👧</div><div class="bn-text">Family</div></div><div class="bn-item"><div class="bn-icon">🗺️</div><div class="bn-text">Map</div></div><div class="bn-item"><div class="bn-icon">⋯</div><div class="bn-text">More</div></div></div>
+            </div>
           </div>
         </div>
-        <span class="text-[10.5px] font-bold text-blue-800 bg-white border border-blue-200 px-2 py-0.5 rounded-full">Encrypted</span>
+        <div style="font-size:12px;color:#64748B;text-align:center">Bottom nav, single-column<br>large touch targets</div>
       </div>
 
-      <!-- Responsive Grid for Tablet / Desktop Reflow -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        
-        <!-- Left Column: User Profile & Safe Status (Col 1 on Desktop) -->
-        <div class="flex flex-col gap-3 md:col-span-1">
-          <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-            <div class="flex items-center gap-3">
-              <img class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBepeTT9JgUhM_4UA9RfwDJaKbp46wuanseosEJlXGHRbdLfCCv2e78KL3HuJSUD_sdZRH05LwXxuonC5NT8zeqQ5GJAXDZn_cpyT1Tku0ypDraOJYN1j-mTnQwAfolLIle1y2FCvEjPO9PCXvz-Ld7j-QeZwHulp_oobzvSPZWJiBL45iDDZIsWHhBOUTCuJv6N7XmICWF10-5emaEw4zGY7AlSHeQw0Zhi8ov8fZ0sid-Pr0OLKHkQQ" alt="Sarah"/>
-              <div>
-                <span class="text-[9.5px] font-bold text-blue-600 tracking-wider block">SAFESPHERE FAMILY</span>
-                <h2 class="text-sm sm:text-base font-bold text-slate-900">Good Morning, Sarah</h2>
-                <span class="text-[11px] text-slate-500">Role: Parent • All Protections</span>
+      <!-- Tablet -->
+      <div class="device-frame">
+        <div class="device-label">📟 Tablet (Side Nav)</div>
+        <div class="tablet-frame">
+          <div class="tablet-screen">
+            <div class="tablet-sidebar">
+              <div style="font-size:7px;font-weight:800;color:#0F172A;padding:4px;margin-bottom:4px">SafeSphere</div>
+              <div class="tablet-nav-item active"><span class="tni">🏠</span><span class="tnl">Home</span></div>
+              <div class="tablet-nav-item"><span class="tni">👨‍👩‍👧</span><span class="tnl">Family</span></div>
+              <div class="tablet-nav-item"><span class="tni">🗺️</span><span class="tnl">Map</span></div>
+              <div class="tablet-nav-item"><span class="tni">📋</span><span class="tnl">Timeline</span></div>
+              <div class="tablet-nav-item"><span class="tni">⚙️</span><span class="tnl">Settings</span></div>
+            </div>
+            <div class="tablet-content">
+              <div style="font-size:8px;font-weight:800;color:#0F172A">Good Morning, Sarah 👋</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px">
+                <div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:5px"><div style="font-size:5.5px;color:#64748B">Family Status</div><div style="font-size:7px;font-weight:700;color:#10B981">✅ All Safe</div></div>
+                <div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:5px"><div style="font-size:5.5px;color:#64748B">Active Journeys</div><div style="font-size:7px;font-weight:700;color:#1D61F2">1 Active</div></div>
+                <div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:5px;grid-column:span 2"><div style="font-size:5.5px;color:#64748B">Student · Alex</div><div style="font-size:6.5px;font-weight:700;color:#0F172A">On trip → Home · ETA 34 min</div></div>
               </div>
             </div>
           </div>
-
-          <div class="bg-emerald-500 text-white p-4 rounded-2xl shadow-md flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">🛡️</div>
-              <div>
-                <h3 class="text-xs sm:text-sm font-bold">Your family is safe</h3>
-                <p class="text-[11px] text-emerald-100">2 active devices • Safe Zone intact</p>
-              </div>
-            </div>
-            <span class="px-2.5 py-1 rounded-full bg-emerald-700 text-white font-bold text-xs">Active</span>
-          </div>
-
-          <!-- Family Members List -->
-          <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-2.5">
-            <div class="flex justify-between items-center">
-              <h3 class="font-bold text-slate-900 text-xs">Monitored Family</h3>
-              <span class="text-[10.5px] font-semibold text-blue-600 cursor-pointer" onclick="tryNavigate('screen-map', null, 'ALL')">View Map &gt;</span>
-            </div>
-            <div class="bg-slate-50 hover:bg-slate-100 p-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-colors" onclick="tryNavigate('screen-map', null, 'ALL')">
-              <div class="flex items-center gap-2.5">
-                <img class="w-9 h-9 rounded-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
-                <div>
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-bold text-xs text-slate-900">Alex</span>
-                    <span class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full">Student</span>
-                  </div>
-                  <span class="text-[10.5px] text-slate-500">In Transit • 12m ETA</span>
-                </div>
-              </div>
-              <span class="text-blue-600 font-bold text-xs">&gt;</span>
-            </div>
-          </div>
         </div>
+        <div style="font-size:12px;color:#64748B;text-align:center">Side nav, two-column grid<br>more content visible</div>
+      </div>
 
-        <!-- Center & Right Columns: Live Telemetry & Actions (Col 2-3 on Desktop) -->
-        <div class="flex flex-col gap-3 md:col-span-2">
-          
-          <!-- Live Telemetry Card with Map Preview -->
-          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-2.5">
-            <div class="flex justify-between items-center text-xs">
-              <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                <span class="font-bold text-slate-900">Live Student Telemetry</span>
+      <!-- Desktop -->
+      <div class="device-frame">
+        <div class="device-label">🖥️ Desktop Dashboard</div>
+        <div class="desktop-frame">
+          <div class="desktop-screen">
+            <div class="desktop-topbar">
+              <div style="font-size:5.5px;font-weight:800;color:#0F172A">🛡️ SafeSphere Family</div>
+              <div style="display:flex;gap:4px;align-items:center">
+                <div style="width:6px;height:6px;border-radius:50%;background:#10B981"></div>
+                <span style="font-size:4.5px;color:#64748B">Sarah · Parent</span>
               </div>
-              <span class="text-slate-400 text-[10.5px]">GPS verified • 3s ago</span>
             </div>
-            
-            <div class="w-full h-44 sm:h-52 rounded-2xl bg-cover bg-center relative overflow-hidden flex items-end p-3 cursor-pointer shadow-inner" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA5M71byQCisxmdNnL9pdkBu4GtwGLYvoWFy4qUF07avfES8Y39y2XZQk5XaUAeyq4x0AJ5zzr0wSyFO3OcBzWRXesEvKzdpJ6mDDZAbevhI2PEPV6FEMDmqktBJpRx0CrYvu6h5Flfbdmxow2VQyevv52m01abUrFtnIhBvieqAwh86BLIUhk4uQSgwLPa9ppXsL_dcevAIFqfPAjJQH_Kw0yXWsZyO1IR5lCw67V0hvGnT5r47Zxmig');" onclick="tryNavigate('screen-map', null, 'ALL')">
-              <div class="bg-white/95 backdrop-blur-md p-3 rounded-xl w-full flex items-center justify-between shadow-md">
-                <div>
-                  <span class="block text-xs font-bold text-slate-900">Highland Way &amp; 4th Ave</span>
-                  <span class="block text-[10.5px] text-slate-500">En route to North Community Library</span>
-                </div>
-                <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3.5 py-1.5 rounded-xl font-bold shadow-sm transition-all active:scale-95">Open Live Map</button>
+            <div class="desktop-main">
+              <div class="desktop-sidebar">
+                <div style="font-size:5px;font-weight:800;color:#F8FAFC;padding:4px;margin-bottom:4px">SafeSphere</div>
+                <div class="desktop-nav active">🏠 Home</div>
+                <div class="desktop-nav">👨‍👩‍👧 Family</div>
+                <div class="desktop-nav">🗺️ Map</div>
+                <div class="desktop-nav">📋 Timeline</div>
+                <div class="desktop-nav">🚨 Emergency</div>
+                <div class="desktop-nav">⚙️ Settings</div>
+              </div>
+              <div class="desktop-content">
+                <div class="dc-card"><div class="dc-title">Family Status</div><div class="dc-value">✅ Safe</div><div class="dc-sub">All members accounted for</div></div>
+                <div class="dc-card"><div class="dc-title">Active Journeys</div><div class="dc-value">1</div><div class="dc-sub">Alex · Home bound</div></div>
+                <div class="dc-card"><div class="dc-title">Safe Zones</div><div class="dc-value">4</div><div class="dc-sub">Home, School, Library, Park</div></div>
+                <div class="dc-card"><div class="dc-title">Today's Events</div><div class="dc-value">8</div><div class="dc-sub">Check-ins &amp; zone events</div></div>
               </div>
             </div>
           </div>
-
-          <!-- Quick Actions Grid (Reflows 2x2 on Mobile, 4-col on Tablet/Desktop) -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
-            <div class="bg-slate-50 hover:bg-blue-50 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all border border-slate-100" onclick="tryNavigate('screen-approval', null, 'PARENT')">
-              <span class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg">🛡️</span>
-              <span class="text-[11px] font-semibold text-slate-800 leading-tight">Parent Approvals</span>
-            </div>
-            <div class="bg-slate-50 hover:bg-indigo-50 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all border border-slate-100" onclick="tryNavigate('screen-map', null, 'ALL')">
-              <span class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg">📍</span>
-              <span class="text-[11px] font-semibold text-slate-800 leading-tight">Safe Zones</span>
-            </div>
-            <div class="bg-slate-50 hover:bg-emerald-50 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all border border-slate-100" onclick="tryNavigate('screen-timeline', null, 'ALL')">
-              <span class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">⏱️</span>
-              <span class="text-[11px] font-semibold text-slate-800 leading-tight">Safety Timeline</span>
-            </div>
-            <div class="bg-slate-50 hover:bg-red-50 p-3 rounded-2xl cursor-pointer flex flex-col items-center gap-1.5 transition-all border border-slate-100" onclick="tryNavigate('screen-emergency', null, 'ALL')">
-              <span class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-lg font-bold">🚨</span>
-              <span class="text-[11px] font-semibold text-red-600 leading-tight font-bold">Emergency SOS</span>
-            </div>
-          </div>
         </div>
-
-      </div>
-    </section>
-
-
-    <!-- ===================== SCREEN: STUDENT DASHBOARD ===================== -->
-    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-student-dash">
-      <!-- Role Security Header Banner -->
-      <div class="bg-emerald-50/90 border border-emerald-200/80 p-3 rounded-2xl flex items-center justify-between">
-        <div class="flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-full bg-emerald-600/10 text-emerald-700 flex items-center justify-center font-bold text-xs">🎒</div>
-          <div>
-            <span class="text-xs font-bold text-emerald-950 block">Student Account • Monitored Corridor Active</span>
-            <span class="text-[10px] text-emerald-700">🔒 Parent controls strictly locked • Autonomous Journey Tracking</span>
-          </div>
-        </div>
-        <span class="text-[10.5px] font-bold text-emerald-800 bg-white border border-emerald-200 px-2 py-0.5 rounded-full">Secure</span>
+        <div style="font-size:12px;color:#64748B;text-align:center">Full sidebar, 4-column KPI grid<br>dashboard-optimized layout</div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Student Greeting Card -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <img class="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow-sm" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
-            <div>
-              <h2 class="text-base font-bold text-slate-900">Hi Alex! 👋</h2>
-              <span class="text-xs font-medium text-emerald-600">Active Safe Corridor: En route to Home</span>
-            </div>
-          </div>
-          <span class="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">Protected</span>
-        </div>
+    </div>
+  </div>
+</section>
 
-        <!-- Active Journey Banner -->
-        <div class="bg-gradient-to-br from-emerald-800 to-emerald-950 text-white p-5 rounded-2xl shadow-lg flex flex-col gap-3">
-          <div class="flex justify-between items-center">
-            <span class="text-[10px] font-bold tracking-wider text-emerald-300">JOURNEY IN PROGRESS</span>
-            <span class="text-xs font-bold bg-emerald-600/40 border border-emerald-400/40 px-2 py-0.5 rounded-full">GPS Live</span>
-          </div>
-          <div class="flex justify-between items-end">
-            <div>
-              <span class="text-lg font-extrabold block">12 Minutes Remaining</span>
-              <span class="text-xs text-emerald-200">2.4 km • Expected Arrival 5:00 PM</span>
-            </div>
-            <button class="bg-white text-emerald-950 text-xs font-bold px-3.5 py-1.5 rounded-xl hover:bg-emerald-50 transition-all shadow-sm active:scale-95" onclick="tryNavigate('screen-map', null, 'ALL')">Live Route</button>
-          </div>
-          <div class="w-full bg-emerald-900/60 rounded-full h-2 overflow-hidden">
-            <div class="bg-emerald-400 h-full rounded-full w-2/3"></div>
-          </div>
-        </div>
+<!-- ════════════════════════════════════════════════════
+     TECH STACK
+════════════════════════════════════════════════════ -->
+<section class="tech-section" id="tech">
+  <div class="tech-inner">
+    <span class="section-label">Technology</span>
+    <h2 class="section-title">Modern Android-First Tech Stack</h2>
+    <p class="section-subtitle">Built with production-grade tools — no shortcuts, no fakes where real integrations exist.</p>
 
-        <!-- Request New Journey Action -->
-        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between cursor-pointer hover:bg-blue-50 transition-colors" onclick="tryNavigate('screen-request', null, 'ALL')">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-lg">🚗</div>
-            <div>
-              <h4 class="text-xs font-bold text-slate-900">Request New Travel Route</h4>
-              <span class="text-[10.5px] text-slate-500">Sends instant approval request to Sarah</span>
-            </div>
-          </div>
-          <span class="text-blue-600 font-bold">&gt;</span>
-        </div>
+    <div class="tech-grid">
+      <div class="tech-pill"><span class="te">🤖</span>Kotlin &amp; Jetpack Compose</div>
+      <div class="tech-pill"><span class="te">🏗️</span>Clean Architecture MVVM</div>
+      <div class="tech-pill"><span class="te">🔥</span>Firebase Auth &amp; Firestore</div>
+      <div class="tech-pill"><span class="te">📬</span>Firebase Cloud Messaging</div>
+      <div class="tech-pill"><span class="te">🗺️</span>Google Maps / MapLibre</div>
+      <div class="tech-pill"><span class="te">📍</span>Geofencing API</div>
+      <div class="tech-pill"><span class="te">🤖</span>ML Kit Face Detection</div>
+      <div class="tech-pill"><span class="te">📷</span>CameraX</div>
+      <div class="tech-pill"><span class="te">🗄️</span>Room Database</div>
+      <div class="tech-pill"><span class="te">💉</span>Hilt DI</div>
+      <div class="tech-pill"><span class="te">🔒</span>Android Keystore</div>
+      <div class="tech-pill"><span class="te">⚡</span>Coroutines &amp; Flow</div>
+      <div class="tech-pill"><span class="te">🐍</span>FastAPI Backend</div>
+      <div class="tech-pill"><span class="te">☁️</span>GCP / Firebase Hosting</div>
+    </div>
+  </div>
+</section>
 
-        <!-- Student SOS Button -->
-        <div class="bg-red-50 p-4 rounded-2xl border border-red-200 flex items-center justify-between cursor-pointer hover:bg-red-100 transition-colors" onclick="tryNavigate('screen-emergency', null, 'ALL')">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center text-lg font-bold">🚨</div>
-            <div>
-              <h4 class="text-xs font-bold text-red-900">Silent SOS &amp; Duress Alert</h4>
-              <span class="text-[10.5px] text-red-700">Instant broadcast to Sarah &amp; trusted contacts</span>
-            </div>
-          </div>
-          <span class="text-red-700 font-bold">&gt;</span>
-        </div>
-      </div>
-    </section>
+<!-- ════════════════════════════════════════════════════
+     CTA
+════════════════════════════════════════════════════ -->
+<section class="cta-section" id="download">
+  <h2 class="cta-title">Ready to protect your <span>family</span>?</h2>
+  <p class="cta-sub">SafeSphere Family — a consent-based journey safety platform that puts transparency at the center of every feature.</p>
+  <div class="hero-actions">
+    <button class="btn-primary" onclick="triggerLoadDemo()">▶ Run Demo Simulator</button>
+    <button class="btn-outline">📄 Parent Guide PDF</button>
+  </div>
+</section>
 
+<footer>
+  <span>SafeSphere Family · Verify. Monitor. Protect.</span><br>
+  Built with Kotlin · Jetpack Compose · Firebase · Material 3
+</footer>
 
-    <!-- ===================== SCREEN: FAMILY MAP ===================== -->
-    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-map">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
-          <div>
-            <h2 class="font-bold text-sm sm:text-base text-slate-900">Live Family Map</h2>
-            <span class="text-[11px] text-slate-500">High-Precision Mutual GPS Sharing</span>
-          </div>
-        </div>
-        <button class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all" onclick="triggerFastSync()">Sync GPS</button>
-      </div>
-
-      <!-- Map Display with Seattle Real Map Visual Asset -->
-      <div class="w-full h-80 sm:h-96 rounded-3xl bg-cover bg-center relative overflow-hidden shadow-inner border border-slate-200" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBQD83Ecc27kbK3Kr4hzwzSM84-goC0l95Y24Wm4lUTe6wBAIZZ-8JROIhBaGfJZGvCJoTmtTO2kgFtFgIn6W1k2OAnE6fY-fdgGmFfCdPoWNduUmJj_TBnytELb0SujIgXEikoBuUxvQYIXkafT0uDuhIDRVf4JMZgytKefncEd1MO4V1-xmGte1Vktf0kouwbJHKDDhAFoLeYpy4Yb1ItWYT1Ze08YzdTMp9WzbvKAUsXoktLFnDfzA');">
-        
-        <!-- Safe Zone Badge -->
-        <div class="absolute top-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.2 rounded-full text-[11px] font-bold text-emerald-900 shadow-md flex items-center gap-2 border border-emerald-200">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-          Safe Zone: Lincoln High School (300m)
-        </div>
-
-        <!-- Student Location Pin Marker -->
-        <div class="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-          <div class="w-16 h-16 rounded-full bg-blue-500/30 animate-ping absolute"></div>
-          <div class="w-12 h-12 rounded-full bg-blue-600/20 absolute"></div>
-          <img class="w-10 h-10 rounded-full border-2 border-white shadow-xl relative z-10 object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuUDbOskAQGe9wBBbJV0PWsQl8o--8l8tJM8C67YeBzCgMGBohBvwFYRc1o-HedyG-xkYnytddSTHGZBbV3YnW8sz2MERzceDeXDpGMKey75OjU5fbAodHu34D5OrABpQ13HauPt_Gom9g50jNUU24fj_hZP8xcmfqR-GJmOYURMKj3DhiAmv-lpY8Q7t2Too5QNxL75_MW8K3E0DaJMK-i4lwCOlz25xG6CIdNRoH6qI0xA2e2LT5kg" alt="Alex"/>
-        </div>
-      </div>
-
-      <!-- Telemetry Info Row -->
-      <div class="grid grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
-        <div>
-          <span class="text-[10px] text-slate-500 block">Remaining</span>
-          <span class="font-bold text-xs sm:text-sm text-slate-900">2.4 km</span>
-        </div>
-        <div>
-          <span class="text-[10px] text-slate-500 block">Est. Arrival</span>
-          <span class="font-bold text-xs sm:text-sm text-slate-900">5:00 PM</span>
-        </div>
-        <div>
-          <span class="text-[10px] text-slate-500 block">Device Battery</span>
-          <span class="font-bold text-xs sm:text-sm text-emerald-600">84% ⚡</span>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- ===================== SCREEN: PARENT APPROVAL ===================== -->
-    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-approval">
-      <div class="flex items-center gap-3">
-        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
-        <div>
-          <h2 class="font-bold text-sm sm:text-base text-slate-900">Parental Travel Consent</h2>
-          <span class="text-[11px] text-slate-500">Student Route Approval Request</span>
-        </div>
-      </div>
-
-      <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-          <span class="text-base">⚠️</span>
-          <h3 class="text-xs font-bold text-amber-950">Approval Required for Travel Corridor</h3>
-        </div>
-        <p class="text-xs text-amber-900">Alex requested permission to travel from School to North Community Library by Car.</p>
-      </div>
-
-      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-3">
-        <div class="flex justify-between text-xs py-1 border-b border-slate-200">
-          <span class="text-slate-500">Origin</span>
-          <span class="font-bold text-slate-900">Lincoln High School</span>
-        </div>
-        <div class="flex justify-between text-xs py-1 border-b border-slate-200">
-          <span class="text-slate-500">Destination</span>
-          <span class="font-bold text-slate-900">North Community Library</span>
-        </div>
-        <div class="flex justify-between text-xs py-1 border-b border-slate-200">
-          <span class="text-slate-500">Travel Mode</span>
-          <span class="font-bold text-blue-600">Car / Vehicle</span>
-        </div>
-        <div class="flex justify-between text-xs py-1">
-          <span class="text-slate-500">Expected Arrival</span>
-          <span class="font-bold text-slate-900">5:00 PM (18 min trip)</span>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3 mt-2">
-        <button class="py-3 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-xl transition-all" onclick="denyJourney()">Decline Route</button>
-        <button class="py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all" onclick="approveJourney()">Grant Consent &amp; Track</button>
-      </div>
-    </section>
-
-
-    <!-- ===================== SCREEN: REQUEST JOURNEY ===================== -->
-    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-request">
-      <div class="flex items-center gap-3">
-        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
-        <div>
-          <h2 class="font-bold text-sm sm:text-base text-slate-900">Request Travel Corridor</h2>
-          <span class="text-[11px] text-slate-500">Submit route for parental consent verification</span>
-        </div>
-      </div>
-
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
-        <div>
-          <label class="text-xs font-bold text-slate-700 block mb-1">Origin Location</label>
-          <input type="text" value="Lincoln High School" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"/>
-        </div>
-        <div>
-          <label class="text-xs font-bold text-slate-700 block mb-1">Destination Location</label>
-          <input type="text" value="North Community Library" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"/>
-        </div>
-        <div>
-          <label class="text-xs font-bold text-slate-700 block mb-1">Travel Mode</label>
-          <div class="grid grid-cols-3 gap-2">
-            <button class="py-2 rounded-xl bg-blue-600 text-white text-xs font-bold">🚗 Car</button>
-            <button class="py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200">🚌 Bus</button>
-            <button class="py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200">🚶 Walk</button>
-          </div>
-        </div>
-        <div>
-          <label class="text-xs font-bold text-slate-700 block mb-1">Estimated Arrival Time</label>
-          <input type="text" value="5:00 PM" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"/>
-        </div>
-
-        <button class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all mt-2" onclick="submitJourney()">Submit for Parent Consent</button>
-      </div>
-    </section>
-
-
-    <!-- ===================== SCREEN: TIMELINE ===================== -->
-    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-timeline">
-      <div class="flex items-center gap-3">
-        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
-        <div>
-          <h2 class="font-bold text-sm sm:text-base text-slate-900">Safety Timeline</h2>
-          <span class="text-[11px] text-slate-500">Immutable geofence &amp; check-in audit log</span>
-        </div>
-      </div>
-
-      <div class="flex flex-col gap-3">
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">🚗</div>
-          <div class="flex-1">
-            <span class="text-xs font-bold text-slate-900 block">En Route: Highland Way</span>
-            <span class="text-[10px] text-slate-500">4:22 PM • Speed 32 km/h • Risk Normal</span>
-          </div>
-          <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Live</span>
-        </div>
-
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">✓</div>
-          <div class="flex-1">
-            <span class="text-xs font-bold text-slate-900 block">Parent Consent Confirmed</span>
-            <span class="text-[10px] text-slate-500">4:14 PM • Sarah granted corridor access</span>
-          </div>
-          <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Approved</span>
-        </div>
-
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">📍</div>
-          <div class="flex-1">
-            <span class="text-xs font-bold text-slate-900 block">Exited Safe Zone: Lincoln High</span>
-            <span class="text-[10px] text-slate-500">4:10 PM • Geofence departure recorded</span>
-          </div>
-          <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">Logged</span>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- ===================== SCREEN: EMERGENCY SOS ===================== -->
-    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-emergency">
-      <div class="flex items-center gap-3">
-        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
-        <div>
-          <h2 class="font-bold text-sm sm:text-base text-slate-900">Emergency Duress Center</h2>
-          <span class="text-[11px] text-slate-500">Instant multi-channel emergency broadcast</span>
-        </div>
-      </div>
-
-      <div class="bg-red-500 text-white p-5 rounded-3xl shadow-lg flex flex-col items-center text-center gap-3">
-        <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-3xl animate-bounce">🚨</div>
-        <h3 class="text-base font-bold">Emergency Alert Broadcast</h3>
-        <p class="text-xs text-red-100 max-w-sm">Pressing the SOS button transmits immediate GPS coordinates, initiates audio verification, and notifies emergency services.</p>
-        <button class="w-full max-w-xs py-3.5 bg-white text-red-600 font-extrabold text-sm rounded-2xl shadow-xl hover:bg-red-50 transition-all active:scale-95" onclick="triggerSOSAlert()">TRIGGER SOS ALERT</button>
-      </div>
-
-      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-2">
-        <span class="text-xs font-bold text-slate-800">Primary Trusted Contact</span>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-600">Sarah Sharma (Parent)</span>
-          <a href="tel:+919876543210" class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-xl">Call +91 98765 43210</a>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- ===================== SCREEN: SETTINGS ===================== -->
-    <section class="screen-view p-4 sm:p-6 lg:p-8 hidden flex flex-col gap-4" id="screen-settings">
-      <div class="flex items-center gap-3">
-        <button class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold text-slate-700" onclick="goHome()">&larr;</button>
-        <div>
-          <h2 class="font-bold text-sm sm:text-base text-slate-900">Safety &amp; Privacy Settings</h2>
-          <span class="text-[11px] text-slate-500">Mutual consent tokens &amp; security parameters</span>
-        </div>
-      </div>
-
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
-        <div class="flex justify-between items-center py-2 border-b border-slate-100">
-          <div>
-            <span class="text-xs font-bold text-slate-900 block">Strict Role Segregation</span>
-            <span class="text-[10.5px] text-slate-500">Blocks cross-role dashboard access</span>
-          </div>
-          <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Enforced</span>
-        </div>
-        <div class="flex justify-between items-center py-2 border-b border-slate-100">
-          <div>
-            <span class="text-xs font-bold text-slate-900 block">Geofence Proximity Alerts</span>
-            <span class="text-[10.5px] text-slate-500">Notifies when entering / leaving safe zones</span>
-          </div>
-          <input type="checkbox" checked class="rounded text-blue-600 w-4 h-4"/>
-        </div>
-        <div class="flex justify-between items-center py-2">
-          <div>
-            <span class="text-xs font-bold text-slate-900 block">Mutual Privacy Handshake</span>
-            <span class="text-[10.5px] text-slate-500">Both devices confirm live tracking handshake</span>
-          </div>
-          <input type="checkbox" checked class="rounded text-blue-600 w-4 h-4"/>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <script>
-    // System Role State: 'PARENT' or 'STUDENT'
-    let currentRole = 'PARENT';
-
-    function toggleActiveRole() {
-      if (currentRole === 'PARENT') {
-        currentRole = 'STUDENT';
-      } else {
-        currentRole = 'PARENT';
-      }
-      updateRoleDisplay();
-    }
-
-    function updateRoleDisplay() {
-      const badge = document.getElementById('active-role-badge');
-      const switchBtn = document.getElementById('switch-role-btn');
-      const tabParent = document.getElementById('tab-parent-dash');
-      const tabStudent = document.getElementById('tab-student-dash');
-      const tabApproval = document.getElementById('tab-parent-approval');
-
-      if (currentRole === 'PARENT') {
-        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-blue-400"></span> Parent Session';
-        switchBtn.innerText = 'Switch to Student';
-        tabParent.innerText = 'Parent Dash';
-        tabStudent.innerText = '🔒 Student Dash';
-        tabApproval.innerText = 'Parent Approval';
-        showScreenById('screen-parent-dash');
-        setActiveTab(tabParent);
-      } else {
-        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Student Session';
-        switchBtn.innerText = 'Switch to Parent';
-        tabParent.innerText = '🔒 Parent Dash';
-        tabStudent.innerText = 'Student Dash';
-        tabApproval.innerText = '🔒 Parent Approval';
-        showScreenById('screen-student-dash');
-        setActiveTab(tabStudent);
-      }
-    }
-
-    // Strict Role-Based Navigation Guard
-    function tryNavigate(screenId, tabBtn, requiredRole) {
-      if (currentRole === 'STUDENT' && (screenId === 'screen-parent-dash' || screenId === 'screen-approval')) {
-        showAccessDenied('🔒 Access Denied: Students are strictly restricted from accessing the Parent Dashboard and Parental Approval controls.');
-        return;
-      }
-
-      if (currentRole === 'PARENT' && screenId === 'screen-student-dash') {
-        showAccessDenied('🔒 Access Denied: Parents monitor family journeys through the Parent Dashboard & Live Family Map. Student view is restricted.');
-        return;
-      }
-
-      showScreenById(screenId);
-      if (tabBtn) {
-        setActiveTab(tabBtn);
-      }
-    }
-
-    function setActiveTab(tabBtn) {
-      document.querySelectorAll('.screen-tab').forEach(b => {
-        b.className = "screen-tab px-3 py-1.5 rounded-xl text-slate-300 hover:text-white whitespace-nowrap transition-all";
+<!-- ════════════════════════════════════════════════════
+     JAVASCRIPT — Animations
+════════════════════════════════════════════════════ -->
+<script>
+  /* ─────────────────────────────────────────────────────
+     Build circular dot spinners (12 dots each)
+  ───────────────────────────────────────────────────── */
+  function buildDotRing(el, count = 12, radius = 8, dotSize = 3.5) {
+    if (!el) return;
+    el.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement('span');
+      const angleDeg = (i / count) * 360;
+      const angleRad = angleDeg * Math.PI / 180;
+      const x = Math.cos(angleRad) * radius;
+      const y = Math.sin(angleRad) * radius;
+      // trail: dot 0 = oldest (low alpha), dot count-1 = head (full alpha)
+      // We want head at current position, so we offset: head is last index
+      const alpha = ((i + 1) / count);
+      Object.assign(span.style, {
+        width:  dotSize + 'px',
+        height: dotSize + 'px',
+        borderRadius: '50%',
+        background: '#6366F1',
+        opacity: alpha,
+        position: 'absolute',
+        left: '50%',
+        top:  '50%',
+        transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
       });
-      tabBtn.className = "screen-tab px-3 py-1.5 rounded-xl bg-blue-600 text-white whitespace-nowrap shadow-sm transition-all";
+      el.appendChild(span);
     }
+  }
 
-    function showScreenById(screenId) {
-      document.querySelectorAll('.screen-view').forEach(s => s.classList.add('hidden'));
-      const target = document.getElementById(screenId);
-      if (target) {
-        target.classList.remove('hidden');
-      }
+  /* Top-center pill: 12 dots, animated rotation */
+  const pillDotRing = document.getElementById('top-dot-ring');
+  buildDotRing(pillDotRing, 12, 8, 3);
+
+  let pillAngle = 0;
+  function rotatePillDots() {
+    pillAngle = (pillAngle + 3) % 360;
+    const dots = pillDotRing ? pillDotRing.querySelectorAll('span') : [];
+    const count = dots.length;
+    dots.forEach((dot, i) => {
+      const angle = ((i / count) * 360 + pillAngle) * Math.PI / 180;
+      const x = Math.cos(angle) * 8;
+      const y = Math.sin(angle) * 8;
+      dot.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+    });
+    requestAnimationFrame(rotatePillDots);
+  }
+  rotatePillDots();
+
+  /* Screen 2 loading ring (static dots) */
+  buildDotRing(document.getElementById('screen-loader-2'), 10, 12, 3);
+
+  /* Page loader ring */
+  const loaderRing = document.getElementById('loader-ring');
+  buildDotRing(loaderRing, 12, 20, 5.5);
+  let loaderAngle = 0;
+  function rotateLoaderDots() {
+    loaderAngle = (loaderAngle + 4) % 360;
+    const dots = loaderRing ? loaderRing.querySelectorAll('span') : [];
+    const count = dots.length;
+    dots.forEach((dot, i) => {
+      const angle = ((i / count) * 360 + loaderAngle) * Math.PI / 180;
+      const x = Math.cos(angle) * 20;
+      const y = Math.sin(angle) * 20;
+      dot.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+    });
+    requestAnimationFrame(rotateLoaderDots);
+  }
+  rotateLoaderDots();
+
+  /* ─────────────────────────────────────────────────────
+     Page load sequence: hide loader, then pill transitions
+  ───────────────────────────────────────────────────── */
+  const loader = document.getElementById('page-loader');
+  const pill   = document.getElementById('loading-pill');
+  const pillLabel = document.getElementById('pill-label');
+
+  // After 2.4 s → hide page loader
+  setTimeout(() => {
+    loader.classList.add('hide');
+    setTimeout(() => loader.remove(), 500);
+  }, 2400);
+
+  // After 4 s → pill transitions to idle (green beacon + "All Protections Armed")
+  setTimeout(() => {
+    // Swap dot ring for beacon
+    const dotRingEl = document.getElementById('top-dot-ring');
+    if (dotRingEl) {
+      dotRingEl.style.display = 'none';
+      const beacon = document.createElement('div');
+      beacon.className = 'idle-beacon';
+      pill.insertBefore(beacon, pillLabel);
     }
+    pillLabel.textContent = 'All Protections Armed';
+    pill.style.borderColor = 'rgba(16,185,129,.35)';
+    pill.style.background  = '#0F172A';
+    // Add SYNC chip
+    const chip = document.createElement('span');
+    chip.className = 'sync-chip';
+    chip.textContent = 'SYNC';
+    pill.appendChild(chip);
+  }, 4000);
 
-    function goHome() {
-      if (currentRole === 'PARENT') {
-        showScreenById('screen-parent-dash');
-        setActiveTab(document.getElementById('tab-parent-dash'));
-      } else {
-        showScreenById('screen-student-dash');
-        setActiveTab(document.getElementById('tab-student-dash'));
-      }
-    }
+  /* ─────────────────────────────────────────────────────
+     Demo trigger (simulates loading state on hero button)
+  ───────────────────────────────────────────────────── */
+  function triggerLoadDemo() {
+    // Re-show loading state in pill for 2 s
+    const beacon  = pill.querySelector('.idle-beacon');
+    const syncChip = pill.querySelector('.sync-chip');
+    if (beacon) beacon.style.display = 'none';
+    if (syncChip) syncChip.style.display = 'none';
+    const existingDotRing = document.getElementById('top-dot-ring');
+    if (existingDotRing) existingDotRing.style.display = 'block';
+    pillLabel.textContent = 'Running demo simulation…';
+    pill.style.borderColor = 'rgba(99,179,237,.35)';
 
-    function showAccessDenied(message) {
-      document.getElementById('access-denied-message').innerText = message;
-      document.getElementById('access-denied-modal').classList.remove('hidden');
-    }
+    setTimeout(() => {
+      if (existingDotRing) existingDotRing.style.display = 'none';
+      if (beacon)  beacon.style.display  = 'block';
+      if (syncChip) syncChip.style.display = 'inline-block';
+      pillLabel.textContent = 'Demo complete · All Protections Armed';
+    }, 3000);
 
-    function closeAccessDeniedModal() {
-      document.getElementById('access-denied-modal').classList.add('hidden');
-    }
-
-    // Top Center Branded Loading Animation (Lag-Free & Optimized)
-    let syncTimer = null;
-    function triggerFastSync() {
-      const label = document.getElementById('top-loading-status-label');
-      const radar = document.getElementById('radar-spinner');
-      const beacon = document.getElementById('idle-beacon');
-      const shimmer = document.getElementById('shimmer-bar');
-      const pill = document.getElementById('top-branded-pill');
-
-      if (syncTimer) clearTimeout(syncTimer);
-
-      radar.classList.remove('hidden');
-      beacon.classList.add('hidden');
-      shimmer.classList.remove('hidden');
-      pill.classList.add('border-cyan-400');
-      pill.classList.remove('border-sky-400/40');
-      label.innerText = 'Syncing Real-time Geofence...';
-
-      syncTimer = setTimeout(() => {
-        label.innerText = 'Mutual Telemetry Synced ✓';
-        radar.classList.add('hidden');
-        beacon.classList.remove('hidden');
-        shimmer.classList.add('hidden');
-        pill.classList.remove('border-cyan-400');
-        pill.classList.add('border-sky-400/40');
-
-        setTimeout(() => {
-          label.innerText = 'All Protections Armed';
-        }, 1800);
-      }, 950);
-    }
-
-    function approveJourney() {
-      triggerFastSync();
-      setTimeout(() => {
-        alert('Route approved! Autonomous corridor established.');
-        showScreenById('screen-map');
-      }, 1000);
-    }
-
-    function denyJourney() {
-      alert('Route request declined.');
-      goHome();
-    }
-
-    function submitJourney() {
-      triggerFastSync();
-      setTimeout(() => {
-        alert('Journey request submitted to Sarah for consent verification.');
-        goHome();
-      }, 1000);
-    }
-
-    function triggerSOSAlert() {
-      alert('🚨 EMERGENCY SOS SENT! High-priority telemetry dispatched to Sarah Sharma and authorities.');
-    }
-  </script>
+    // Scroll to screens
+    document.getElementById('screens').scrollIntoView({ behavior: 'smooth' });
+  }
+</script>
 </body>
 </html>
