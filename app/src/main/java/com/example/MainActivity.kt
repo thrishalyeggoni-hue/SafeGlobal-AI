@@ -1,0 +1,342 @@
+package com.example
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.model.UserRole
+import com.example.ui.components.SafeSphereBottomNavigation
+import com.example.ui.screens.CompleteProfileScreen
+import com.example.ui.screens.ConsentScreen
+import com.example.ui.screens.CreateIdScreen
+import com.example.ui.screens.CreatePasswordScreen
+import com.example.ui.screens.DemoSimulatorScreen
+import com.example.ui.screens.EmergencyScreen
+import com.example.ui.screens.FamilyMapScreen
+import com.example.ui.screens.FamilyMembersScreen
+import com.example.ui.screens.LoadingScreen
+import com.example.ui.screens.OtpVerificationScreen
+import com.example.ui.screens.ParentApprovalScreen
+import com.example.ui.screens.ParentDashboardScreen
+import com.example.ui.screens.PhoneVerificationScreen
+import com.example.ui.screens.ProfileScreen
+import com.example.ui.screens.RequestJourneyScreen
+import com.example.ui.screens.RoleSelectionScreen
+import com.example.ui.screens.SafeZonesScreen
+import com.example.ui.screens.SafetyTimelineScreen
+import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.SplashScreen
+import com.example.ui.screens.StudentDashboardScreen
+import com.example.ui.theme.SafeSphereTheme
+import com.example.ui.viewmodel.SafeSphereViewModel
+import com.example.ui.viewmodel.ScreenDestination
+
+class MainActivity : ComponentActivity() {
+
+    private val viewModel: SafeSphereViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            val themeAccent by viewModel.themeAccent.collectAsState()
+
+            SafeSphereTheme(primaryAccent = themeAccent) {
+                SafeSphereApp(viewModel = viewModel)
+            }
+        }
+    }
+}
+
+@Composable
+fun SafeSphereApp(viewModel: SafeSphereViewModel) {
+    val currentScreen by viewModel.currentScreen.collectAsState()
+    val currentNavTab by viewModel.currentNavTab.collectAsState()
+    val activeRole by viewModel.activeDashboardRole.collectAsState()
+
+    // Back handling for sub-screens
+    BackHandler(
+        enabled = currentScreen != ScreenDestination.PARENT_DASHBOARD &&
+            currentScreen != ScreenDestination.STUDENT_DASHBOARD &&
+            currentScreen != ScreenDestination.SPLASH
+    ) {
+        when (currentScreen) {
+            ScreenDestination.LOADING -> viewModel.navigateTo(ScreenDestination.SPLASH)
+            ScreenDestination.CONSENT -> viewModel.navigateTo(ScreenDestination.LOADING)
+            ScreenDestination.PHONE_VERIFY -> viewModel.navigateTo(ScreenDestination.CONSENT)
+            ScreenDestination.OTP_VERIFY -> viewModel.navigateTo(ScreenDestination.PHONE_VERIFY)
+            ScreenDestination.CHOOSE_ROLE -> viewModel.navigateTo(ScreenDestination.OTP_VERIFY)
+            ScreenDestination.CREATE_ID -> viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE)
+            ScreenDestination.CREATE_PASSWORD -> viewModel.navigateTo(ScreenDestination.CREATE_ID)
+            ScreenDestination.COMPLETE_PROFILE -> viewModel.navigateTo(ScreenDestination.CREATE_PASSWORD)
+            ScreenDestination.REQUEST_JOURNEY,
+            ScreenDestination.PARENT_APPROVAL,
+            ScreenDestination.SAFETY_TIMELINE,
+            ScreenDestination.FAMILY_MAP,
+            ScreenDestination.EMERGENCY,
+            ScreenDestination.SETTINGS,
+            ScreenDestination.DEMO_SIMULATOR,
+            ScreenDestination.SAFE_ZONES,
+            ScreenDestination.FAMILY_MEMBERS,
+            ScreenDestination.PROFILE -> {
+                if (activeRole == UserRole.PARENT) {
+                    viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+                } else {
+                    viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+                }
+            }
+            else -> {}
+        }
+    }
+
+    val isDataLoading by viewModel.isDataLoading.collectAsState()
+    val loadingStatus by viewModel.loadingStatus.collectAsState()
+
+    val showBottomNav = currentScreen in listOf(
+        ScreenDestination.PARENT_DASHBOARD,
+        ScreenDestination.STUDENT_DASHBOARD,
+        ScreenDestination.FAMILY_MAP,
+        ScreenDestination.FAMILY_MEMBERS,
+        ScreenDestination.SETTINGS,
+        ScreenDestination.PROFILE
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF1F5F9)),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Scaffold(
+            modifier = Modifier
+                .fillMaxHeight()
+                .widthIn(max = 640.dp)
+                .testTag("safesphere_app_scaffold"),
+            bottomBar = {
+                if (showBottomNav) {
+                    SafeSphereBottomNavigation(
+                        selectedTab = currentNavTab,
+                        onTabSelected = { viewModel.selectNavTab(it) }
+                    )
+                }
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                // Interactive Preview Screen Switcher Strip (matches HTML prototype switcher)
+                if (currentScreen != ScreenDestination.SPLASH && currentScreen != ScreenDestination.LOADING) {
+                    InteractiveScreenSwitcherBar(
+                        currentScreen = currentScreen,
+                        onSelect = { viewModel.navigateTo(it) }
+                    )
+                }
+
+                // Global Top-Center Water Wave Loading Indicator during any data operation
+                if (isDataLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        com.example.ui.components.WaterWaveLoadingIndicator(
+                            isLoading = true,
+                            label = loadingStatus
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f)
+                ) {
+                when (currentScreen) {
+                    ScreenDestination.SPLASH -> SplashScreen(
+                        onTimeoutOrNext = { viewModel.navigateTo(ScreenDestination.LOADING) }
+                    )
+                    ScreenDestination.LOADING -> LoadingScreen(
+                        onLoaded = { viewModel.navigateTo(ScreenDestination.CONSENT) }
+                    )
+                    ScreenDestination.CONSENT -> ConsentScreen(
+                        onContinue = { viewModel.navigateTo(ScreenDestination.PHONE_VERIFY) },
+                        onBack = { viewModel.navigateTo(ScreenDestination.SPLASH) }
+                    )
+                    ScreenDestination.PHONE_VERIFY -> PhoneVerificationScreen(
+                        viewModel = viewModel,
+                        onSendOtp = { viewModel.navigateTo(ScreenDestination.OTP_VERIFY) },
+                        onBack = { viewModel.navigateTo(ScreenDestination.CONSENT) }
+                    )
+                    ScreenDestination.OTP_VERIFY -> OtpVerificationScreen(
+                        viewModel = viewModel,
+                        onVerifyOtp = { viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE) },
+                        onBack = { viewModel.navigateTo(ScreenDestination.PHONE_VERIFY) }
+                    )
+                    ScreenDestination.CHOOSE_ROLE -> RoleSelectionScreen(
+                        viewModel = viewModel,
+                        onContinue = { viewModel.navigateTo(ScreenDestination.CREATE_ID) },
+                        onBack = { viewModel.navigateTo(ScreenDestination.OTP_VERIFY) }
+                    )
+                    ScreenDestination.CREATE_ID -> CreateIdScreen(
+                        viewModel = viewModel,
+                        onContinue = { viewModel.navigateTo(ScreenDestination.CREATE_PASSWORD) },
+                        onBack = { viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE) }
+                    )
+                    ScreenDestination.CREATE_PASSWORD -> CreatePasswordScreen(
+                        viewModel = viewModel,
+                        onContinue = { viewModel.navigateTo(ScreenDestination.COMPLETE_PROFILE) },
+                        onBack = { viewModel.navigateTo(ScreenDestination.CREATE_ID) }
+                    )
+                    ScreenDestination.COMPLETE_PROFILE -> CompleteProfileScreen(
+                        viewModel = viewModel,
+                        onCreateAccount = {
+                            if (viewModel.selectedRole.value == UserRole.PARENT) {
+                                viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
+                            } else {
+                                viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+                            }
+                        },
+                        onBack = { viewModel.navigateTo(ScreenDestination.CREATE_PASSWORD) }
+                    )
+                    ScreenDestination.PARENT_DASHBOARD -> ParentDashboardScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.STUDENT_DASHBOARD -> StudentDashboardScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.FAMILY_MAP -> FamilyMapScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.REQUEST_JOURNEY -> RequestJourneyScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.PARENT_APPROVAL -> ParentApprovalScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.SAFETY_TIMELINE -> SafetyTimelineScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.EMERGENCY -> EmergencyScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.SETTINGS -> SettingsScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.DEMO_SIMULATOR -> DemoSimulatorScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.SAFE_ZONES -> SafeZonesScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.FAMILY_MEMBERS -> FamilyMembersScreen(
+                        viewModel = viewModel
+                    )
+                    ScreenDestination.PROFILE -> ProfileScreen(
+                        viewModel = viewModel
+                    )
+                }
+            }
+        }
+    }
+}
+}
+
+/**
+ * Top preview switcher bar allowing instant 1-tap switching between all requested screens.
+ */
+@Composable
+fun InteractiveScreenSwitcherBar(
+    currentScreen: ScreenDestination,
+    onSelect: (ScreenDestination) -> Unit
+) {
+    val screenOptions = listOf(
+        Pair("Consent", ScreenDestination.CONSENT),
+        Pair("Phone", ScreenDestination.PHONE_VERIFY),
+        Pair("Verify OTP", ScreenDestination.OTP_VERIFY),
+        Pair("Choose Role", ScreenDestination.CHOOSE_ROLE),
+        Pair("Create ID", ScreenDestination.CREATE_ID),
+        Pair("Password", ScreenDestination.CREATE_PASSWORD),
+        Pair("Profile Setup", ScreenDestination.COMPLETE_PROFILE),
+        Pair("Parent Dash", ScreenDestination.PARENT_DASHBOARD),
+        Pair("Student Dash", ScreenDestination.STUDENT_DASHBOARD),
+        Pair("Family Map", ScreenDestination.FAMILY_MAP),
+        Pair("Request Journey", ScreenDestination.REQUEST_JOURNEY),
+        Pair("Parent Approval", ScreenDestination.PARENT_APPROVAL),
+        Pair("Timeline", ScreenDestination.SAFETY_TIMELINE),
+        Pair("Emergency SOS", ScreenDestination.EMERGENCY),
+        Pair("Settings", ScreenDestination.SETTINGS),
+        Pair("Simulator", ScreenDestination.DEMO_SIMULATOR),
+        Pair("Safe Zones", ScreenDestination.SAFE_ZONES),
+        Pair("Family Members", ScreenDestination.FAMILY_MEMBERS),
+        Pair("Profile", ScreenDestination.PROFILE),
+        Pair("Splash", ScreenDestination.SPLASH),
+        Pair("Loading", ScreenDestination.LOADING)
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFEFF4FF))
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        screenOptions.forEach { (title, screen) ->
+            val isSelected = currentScreen == screen
+            FilterChip(
+                selected = isSelected,
+                onClick = { onSelect(screen) },
+                label = {
+                    Text(
+                        text = title,
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFF1652F0),
+                    selectedLabelColor = Color.White,
+                    containerColor = Color.White,
+                    labelColor = Color(0xFF121C2A)
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .padding(horizontal = 3.dp)
+                    .testTag("preview_tab_${screen.name.lowercase()}")
+            )
+        }
+    }
+}
