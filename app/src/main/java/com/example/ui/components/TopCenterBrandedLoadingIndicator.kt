@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -34,20 +33,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
- * Premium, branded top-center loading and status indicator inspired by top-tier
- * applications (Dynamic Island / Uber Safety / Stripe).
- * Features a hardware-accelerated orbital radar, security beacon, and smooth status transitions.
+ * Top-center branded loading + status pill.
+ *
+ * LOADING STATE  → 12 circular dots arranged on a clock-face arc; each dot's
+ *                  opacity trails from 1.0 (head) to 0.08 (tail), creating a
+ *                  clean sweep-spinner matching the SafeSphere mockup design.
+ *
+ * IDLE STATE     → Steady green security beacon with a slow breathing pulse ring,
+ *                  plus optional SYNC chip.
+ *
+ * Slides in/out from the top with fade so it never feels jarring.
  */
 @Composable
 fun TopCenterBrandedLoadingIndicator(
@@ -57,172 +62,170 @@ fun TopCenterBrandedLoadingIndicator(
     showBadge: Boolean = true,
     onSyncClick: (() -> Unit)? = null
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "branded_loading_transition")
-
-    // Smooth rotating radar arc
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "radar_spin"
-    )
-
-    // Pulsing glow aura for active state
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
-
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_alpha"
-    )
-
-    val shimmerOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmer_offset"
-    )
-
-    Box(
+    AnimatedVisibility(
+        visible = true,
+        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
         modifier = modifier
-            .testTag("top_branded_loading_pill")
-            .shadow(elevation = 6.dp, shape = RoundedCornerShape(20.dp), spotColor = Color(0x33000000))
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF0F172A))
-            .border(
-                width = 1.dp,
-                color = if (isLoading) Color(0xFF38BDF8).copy(alpha = 0.6f) else Color(0xFF334155),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .clickable(enabled = onSyncClick != null) { onSyncClick?.invoke() }
-            .padding(horizontal = 14.dp, vertical = 7.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
+        val infiniteTransition = rememberInfiniteTransition(label = "safesphere_pill")
+
+        // Full rotation: 0 → 360° over 1 200 ms (smooth, not jerky)
+        val rotationAngle by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "dot_rotation"
+        )
+
+        // Idle beacon breathing (scale 0.85 → 1.20)
+        val beaconPulse by infiniteTransition.animateFloat(
+            initialValue = 0.85f,
+            targetValue = 1.20f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1400, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "beacon_pulse"
+        )
+
+        // ── outer pill container ──────────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .testTag("top_center_branded_loading_indicator")
+                .shadow(
+                    elevation = if (isLoading) 8.dp else 2.dp,
+                    shape = RoundedCornerShape(20.dp),
+                    ambientColor = if (isLoading) Color(0x4400C6FF) else Color(0x1A000000)
+                )
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    if (isLoading) Color(0xFF0F172A) else Color(0xFFF8FAFC)
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (isLoading) Color(0x6600C6FF) else Color(0xFFE2E8F0),
+                    shape = RoundedCornerShape(20.dp)
+                )
+                .clickable(
+                    enabled = onSyncClick != null && !isLoading,
+                    onClick = { onSyncClick?.invoke() }
+                )
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
         ) {
-            if (isLoading) {
-                // Orbital Radar Arc Spinner
-                Box(
-                    modifier = Modifier.size(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(modifier = Modifier.size(16.dp)) {
-                        val strokeWidth = 2.2.dp.toPx()
-                        drawCircle(
-                            color = Color(0xFF1E293B),
-                            radius = (size.minDimension - strokeWidth) / 2,
-                            style = Stroke(width = strokeWidth)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+
+                // ── LEFT INDICATOR ──────────────────────────────────────────
+                if (isLoading) {
+                    // Circular dot spinner (12 dots, clock-face sweep)
+                    CircularDotSpinner(
+                        rotationAngle = rotationAngle,
+                        modifier = Modifier.size(18.dp)
+                    )
+                } else {
+                    // Idle green security beacon
+                    Box(
+                        modifier = Modifier.size(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Breathing pulse ring
+                        Box(
+                            modifier = Modifier
+                                .size((14 * beaconPulse).dp)
+                                .clip(CircleShape)
+                                .background(Color(0x2210B981))
                         )
-                        drawArc(
-                            brush = Brush.sweepGradient(
-                                listOf(
-                                    Color(0xFF00E5FF).copy(alpha = 0.1f),
-                                    Color(0xFF38BDF8),
-                                    Color(0xFF00E5FF)
-                                )
-                            ),
-                            startAngle = rotationAngle,
-                            sweepAngle = 140f,
-                            useCenter = false,
-                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                        // Solid core
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF10B981))
                         )
                     }
                 }
-            } else {
-                // Steady Emerald Security Beacon
-                Box(
-                    modifier = Modifier.size(14.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+
+                // ── LABEL ───────────────────────────────────────────────────
+                Text(
+                    text = if (isLoading) label else label,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isLoading) Color(0xFFF1F5F9) else Color(0xFF1E293B),
+                    letterSpacing = 0.2.sp,
+                    maxLines = 1
+                )
+
+                // ── SYNC CHIP (idle only) ───────────────────────────────────
+                if (onSyncClick != null && !isLoading && showBadge) {
+                    Spacer(modifier = Modifier.width(2.dp))
                     Box(
                         modifier = Modifier
-                            .size(14.dp * pulseScale)
-                            .clip(CircleShape)
-                            .background(Color(0xFF10B981).copy(alpha = pulseAlpha * 0.4f))
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF10B981))
-                    )
-                }
-            }
-
-            // Status Typography
-            Text(
-                text = label,
-                color = Color(0xFFF8FAFC),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.2.sp
-            )
-
-            // Optional Fast Sync Badge
-            if (showBadge && !isLoading && onSyncClick != null) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF1E293B))
-                        .border(0.5.dp, Color(0xFF38BDF8).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "SYNC",
-                        color = Color(0xFF38BDF8),
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFEFF6FF))
+                            .clickable { onSyncClick.invoke() }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "SYNC",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1D4ED8)
+                        )
+                    }
                 }
             }
         }
+    }
+}
 
-        // Shimmer line during loading
-        if (isLoading) {
-            Canvas(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clip(RoundedCornerShape(20.dp))
-            ) {
-                val w = size.width
-                val h = size.height
-                val barWidth = w * 0.4f
-                val startX = (shimmerOffset * (w + barWidth)) - barWidth
-                drawRect(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color(0xFF00E5FF),
-                            Color(0xFF38BDF8),
-                            Color.Transparent
-                        ),
-                        startX = startX,
-                        endX = startX + barWidth
-                    ),
-                    topLeft = Offset(0f, h - 2.dp.toPx()),
-                    size = Size(w, 2.dp.toPx())
-                )
-            }
+/**
+ * 12-dot circular sweep spinner.
+ *
+ * Each dot sits on the rim of the circle at [index * 30°] offset by [rotationAngle].
+ * Opacity trails from 1.0 (head dot) down to ~0.08 (tail dot) — just like the
+ * standard iOS/SafeSphere loading reference.
+ *
+ * @param rotationAngle  live animated angle (0..360) from the caller
+ * @param dotCount       number of dots on the circle face (default 12)
+ * @param dotColor       base colour of the dots (default SafeSphere sky-blue)
+ */
+@Composable
+fun CircularDotSpinner(
+    rotationAngle: Float,
+    modifier: Modifier = Modifier,
+    dotCount: Int = 12,
+    dotColor: Color = Color(0xFF38BDF8)
+) {
+    Canvas(modifier = modifier) {
+        val radius = size.minDimension / 2f
+        val dotRadius = radius * 0.165f          // ~16 % of half-size
+        val orbitRadius = radius - dotRadius      // orbit rim
+
+        repeat(dotCount) { index ->
+            // angle for this dot, with the rotation offset applied
+            val angleDeg = (index * (360f / dotCount) + rotationAngle) % 360f
+            val angleRad = (angleDeg * PI / 180).toFloat()
+
+            // opacity: head dot (last index) → 1.0, tail (index 0) → 0.08
+            // We map index 0 = oldest (lowest alpha) → index dotCount-1 = newest (max alpha)
+            val fraction = index.toFloat() / (dotCount - 1)   // 0 → 1
+            val alpha = 0.08f + fraction * 0.92f              // 0.08 → 1.0
+
+            val cx = center.x + orbitRadius * cos(angleRad)
+            val cy = center.y + orbitRadius * sin(angleRad)
+
+            drawCircle(
+                color = dotColor.copy(alpha = alpha),
+                radius = dotRadius,
+                center = Offset(cx, cy)
+            )
         }
     }
 }

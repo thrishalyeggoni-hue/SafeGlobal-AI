@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserRole
 import com.example.ui.components.SafeSphereBottomNavigation
+import com.example.ui.components.WithSafeSphereWatermark
 import com.example.ui.components.TopCenterBrandedLoadingIndicator
 import com.example.ui.screens.CompleteProfileScreen
 import com.example.ui.screens.ConsentScreen
@@ -182,6 +183,7 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
         ScreenDestination.PROFILE
     )
 
+    WithSafeSphereWatermark {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -314,6 +316,7 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
                 }
             }
         }
+    }
     }
 }
 }
