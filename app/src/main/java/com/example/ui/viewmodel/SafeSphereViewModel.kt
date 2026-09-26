@@ -1,9 +1,12 @@
 package com.example.ui.viewmodel
 
+import android.app.Activity
 import android.app.Application
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.auth.FirebaseAuthManager
+import com.example.data.auth.FirestoreUserManager
 import com.example.data.local.SafeSphereDatabase
 import com.example.data.model.EmergencySettings
 import com.example.data.model.JourneyRecord
@@ -65,13 +68,13 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     val currentUser: StateFlow<SafeSphereUser?> = repository.currentUser
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SafeSphereUser())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val safeZones: StateFlow<List<SafeZone>> = repository.allSafeZones
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val latestJourney: StateFlow<JourneyRecord?> = repository.latestJourney
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), JourneyRecord())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val timelineEvents: StateFlow<List<TimelineEvent>> = repository.timelineEvents
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -86,35 +89,51 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     private val _currentNavTab = MutableStateFlow(NavTab.HOME)
     val currentNavTab: StateFlow<NavTab> = _currentNavTab.asStateFlow()
 
+    // Drawer open state
+    private val _isDrawerOpen = MutableStateFlow(false)
+    val isDrawerOpen: StateFlow<Boolean> = _isDrawerOpen.asStateFlow()
+
     // Dashboard toggle between Parent and Student view
     private val _activeDashboardRole = MutableStateFlow(UserRole.PARENT)
     val activeDashboardRole: StateFlow<UserRole> = _activeDashboardRole.asStateFlow()
+
+    // Firestore profile of the currently logged-in user
+    private val _firestoreProfile = MutableStateFlow<FirestoreUserManager.UserProfile?>(null)
+    val firestoreProfile: StateFlow<FirestoreUserManager.UserProfile?> = _firestoreProfile.asStateFlow()
 
     // Theme color accent
     private val _themeAccent = MutableStateFlow(AccentBlue)
     val themeAccent: StateFlow<Color> = _themeAccent.asStateFlow()
 
-    // Form states
-    var phoneInput = MutableStateFlow("9876543210")
-    var otpInputs = MutableStateFlow(listOf("1", "2", "3", "4", "5", "6"))
-    var selectedRole = MutableStateFlow(UserRole.PARENT)
-    var safeSphereIdInput = MutableStateFlow("safefamily123")
-    var passwordInput = MutableStateFlow("SecurePass123!")
-    var fullNameInput = MutableStateFlow("John Doe")
-    var gradeClassInput = MutableStateFlow("10th Grade")
+    // --- Form states — ALL EMPTY by default, no fake data ---
+    var phoneInput = MutableStateFlow("")
+    var countryCode = MutableStateFlow("+91")
 
-    // Dedicated 2-Login System: Student and Parent
-    var studentIdInput = MutableStateFlow("student_alex")
-    var studentPasswordInput = MutableStateFlow("AlexPass123!")
-    var parentIdInput = MutableStateFlow("parent_sarah")
-    var parentPasswordInput = MutableStateFlow("SarahPass123!")
+    // OTP inputs — 6 empty strings
+    var otpInputs = MutableStateFlow(List(6) { "" })
+
+    var selectedRole = MutableStateFlow(UserRole.PARENT)
+    var safeSphereIdInput = MutableStateFlow("")
+    var safeSphereIdAvailable = MutableStateFlow<Boolean?>(null)   // null = unchecked
+    var passwordInput = MutableStateFlow("")
+    var fullNameInput = MutableStateFlow("")
+    var gradeClassInput = MutableStateFlow("")
+
+    // Login form (for returning users)
+    var studentIdInput = MutableStateFlow("")
+    var studentPasswordInput = MutableStateFlow("")
+    var parentIdInput = MutableStateFlow("")
+    var parentPasswordInput = MutableStateFlow("")
     var loginErrorMessage = MutableStateFlow<String?>(null)
 
-    // Journey Request Form
-    var journeyFrom = MutableStateFlow("School")
-    var journeyTo = MutableStateFlow("Home")
+    // Firebase auth state — exposed for UI
+    val firebaseAuthState = FirebaseAuthManager.authState
+
+    // Journey Request Form — empty defaults
+    var journeyFrom = MutableStateFlow("")
+    var journeyTo = MutableStateFlow("")
     var journeyMode = MutableStateFlow(TravelMode.CAR)
-    var journeyArrivalTime = MutableStateFlow("5:00 PM")
+    var journeyArrivalTime = MutableStateFlow("")
 
     // Demo Simulation Status
     private val _demoStatusMessage = MutableStateFlow<String?>(null)
@@ -130,8 +149,24 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     private val _accessDeniedMessage = MutableStateFlow<String?>(null)
     val accessDeniedMessage: StateFlow<String?> = _accessDeniedMessage.asStateFlow()
 
+    // OTP verification error for UI
+    private val _otpError = MutableStateFlow<String?>(null)
+    val otpError: StateFlow<String?> = _otpError.asStateFlow()
+
+    // SafeSphere ID check loading
+    private val _checkingId = MutableStateFlow(false)
+    val checkingId: StateFlow<Boolean> = _checkingId.asStateFlow()
+
+    fun openDrawer() { _isDrawerOpen.value = true }
+    fun closeDrawer() { _isDrawerOpen.value = false }
+    fun toggleDrawer() { _isDrawerOpen.value = !_isDrawerOpen.value }
+
     fun dismissAccessDenied() {
         _accessDeniedMessage.value = null
+    }
+
+    fun clearOtpError() {
+        _otpError.value = null
     }
 
     fun triggerDataSync() {
@@ -143,6 +178,156 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
             _isDataLoading.value = false
             delay(1800)
             _loadingStatus.value = "All Protections Armed"
+        }
+    }
+
+    // --- REAL Firebase Phone Auth ---
+
+    /**
+     * Sends real OTP to the phone number entered by the user.
+     * Requires an Activity reference for Firebase reCAPTCHA.
+     */
+    fun sendRealOtp(activity: Activity) {
+        val phone = phoneInput.value.trim()
+        val code = countryCode.value.trim()
+
+        if (phone.length < 10) {
+            _otpError.value = "Please enter a valid 10-digit mobile number."
+            return
+        }
+
+        val fullNumber = "$code$phone"
+        _otpError.value = null
+        FirebaseAuthManager.sendOtp(fullNumber, activity)
+    }
+
+    fun resendRealOtp(activity: Activity) {
+        val fullNumber = "${countryCode.value.trim()}${phoneInput.value.trim()}"
+        FirebaseAuthManager.resendOtp(fullNumber, activity)
+    }
+
+    /**
+     * Verifies the OTP entered by the user against Firebase.
+     */
+    fun verifyRealOtp(onSuccess: () -> Unit) {
+        val otp = otpInputs.value.joinToString("")
+        if (otp.length != 6 || !otp.all { it.isDigit() }) {
+            _otpError.value = "Please enter all 6 digits of the OTP."
+            return
+        }
+        _otpError.value = null
+        FirebaseAuthManager.verifyOtp(otp)
+        // Navigation on success is handled by observing firebaseAuthState in MainActivity
+    }
+
+    /**
+     * Called after OTP verified — loads or creates Firestore profile.
+     * If profile exists: navigate to correct dashboard.
+     * If new: navigate to role selection.
+     */
+    fun onOtpVerified() {
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Fetching your profile..."
+
+            val uid = FirebaseAuthManager.currentUser?.uid
+            if (uid == null) {
+                _isDataLoading.value = false
+                _otpError.value = "Auth error: no user found. Please try again."
+                return@launch
+            }
+
+            val profile = FirestoreUserManager.getUserProfile(uid)
+            _isDataLoading.value = false
+
+            if (profile != null && profile.isProfileComplete) {
+                // Returning user: go straight to correct dashboard
+                _firestoreProfile.value = profile
+                _activeDashboardRole.value = profile.toUserRole()
+                _loadingStatus.value = "Welcome back, ${profile.displayName}!"
+                if (profile.toUserRole() == UserRole.PARENT) {
+                    _currentScreen.value = ScreenDestination.PARENT_DASHBOARD
+                } else {
+                    _currentScreen.value = ScreenDestination.STUDENT_DASHBOARD
+                }
+            } else {
+                // New user: go to role selection
+                _currentScreen.value = ScreenDestination.CHOOSE_ROLE
+            }
+        }
+    }
+
+    /**
+     * Checks if entered SafeSphere ID is available in Firestore.
+     */
+    fun checkSafeSphereIdAvailability() {
+        val id = safeSphereIdInput.value.trim()
+        if (id.length < 4) {
+            safeSphereIdAvailable.value = null
+            return
+        }
+        viewModelScope.launch {
+            _checkingId.value = true
+            safeSphereIdAvailable.value = FirestoreUserManager.isSafeSphereIdAvailable(id)
+            _checkingId.value = false
+        }
+    }
+
+    /**
+     * Creates the user profile in Firestore after completing profile setup.
+     */
+    fun createRealAccount(onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            _isDataLoading.value = true
+            _loadingStatus.value = "Creating your account..."
+
+            val user = FirebaseAuthManager.currentUser
+            if (user == null) {
+                _isDataLoading.value = false
+                onError("Session expired. Please restart the app and sign in again.")
+                return@launch
+            }
+
+            val name = fullNameInput.value.trim()
+            val id = safeSphereIdInput.value.trim()
+            val grade = gradeClassInput.value.trim()
+            val role = selectedRole.value
+
+            if (name.isEmpty() || id.isEmpty()) {
+                _isDataLoading.value = false
+                onError("Name and SafeSphere ID are required.")
+                return@launch
+            }
+
+            val result = FirestoreUserManager.createInitialProfile(
+                user = user,
+                role = role,
+                displayName = name,
+                safeSphereId = id,
+                gradeClass = grade
+            )
+
+            _isDataLoading.value = false
+
+            result.onSuccess {
+                _activeDashboardRole.value = role
+                _loadingStatus.value = "Account created! Welcome, $name 🎉"
+                // Also save to local Room DB for offline use
+                val safeUser = SafeSphereUser(
+                    id = user.uid,
+                    phone = user.phoneNumber ?: "",
+                    safeSphereId = id,
+                    displayName = name,
+                    role = role,
+                    gradeClass = grade,
+                    isPhoneVerified = true,
+                    hasAcceptedConsent = true
+                )
+                repository.saveUser(safeUser)
+                onSuccess()
+            }.onFailure { e ->
+                onError(e.localizedMessage ?: "Account creation failed. Please try again.")
+            }
         }
     }
 
@@ -224,6 +409,15 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun logout() {
+        FirebaseAuthManager.signOut()
+        // Clear local state
+        phoneInput.value = ""
+        otpInputs.value = List(6) { "" }
+        fullNameInput.value = ""
+        safeSphereIdInput.value = ""
+        passwordInput.value = ""
+        gradeClassInput.value = ""
+        _firestoreProfile.value = null
         _currentScreen.value = ScreenDestination.CHOOSE_ROLE
         _activeDashboardRole.value = UserRole.PARENT
         _currentNavTab.value = NavTab.HOME
@@ -267,8 +461,9 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             _isDataLoading.value = true
             _loadingStatus.value = "Broadcasting Route Request..."
+            val profile = _firestoreProfile.value
             val record = JourneyRecord(
-                studentName = "Alex",
+                studentName = profile?.displayName ?: "Student",
                 origin = journeyFrom.value,
                 destination = journeyTo.value,
                 travelMode = journeyMode.value,
@@ -298,7 +493,7 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
             repository.addTimelineEvent(
                 TimelineEvent(
                     title = "Parent Approved",
-                    timeFormatted = "4:14 PM",
+                    timeFormatted = "Now",
                     locationOrStatus = "Consent Confirmed",
                     iconType = "check"
                 )
@@ -350,7 +545,6 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     fun submitPin(enteredPin: String, onSuccess: () -> Unit, onDuress: () -> Unit) {
         val settings = emergencySettings.value ?: EmergencySettings()
         if (enteredPin == settings.duressPin) {
-            // Duress pin triggered: silently initiate emergency
             viewModelScope.launch {
                 _isDataLoading.value = true
                 _loadingStatus.value = "Updating Status..."
@@ -390,7 +584,7 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
             _demoStatusMessage.value = "✓ Step 2: Parent approved. Telemetry active."
             delay(1200)
             _loadingStatus.value = "Within Safe Corridor"
-            _demoStatusMessage.value = "🗺️ Step 3: Moving along safe corridor (Highland Way)"
+            _demoStatusMessage.value = "🗺️ Step 3: Moving along safe corridor"
             delay(1200)
             _isDataLoading.value = false
             _loadingStatus.value = "Simulation Complete ✓"

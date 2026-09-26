@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -23,10 +24,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -37,6 +43,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,11 +57,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserRole
 import com.example.ui.theme.darkTextFieldColors
 import com.example.ui.viewmodel.SafeSphereViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun CreateIdScreen(
@@ -64,12 +73,23 @@ fun CreateIdScreen(
     modifier: Modifier = Modifier
 ) {
     val idInput by viewModel.safeSphereIdInput.collectAsState()
+    val isAvailable by viewModel.safeSphereIdAvailable.collectAsState()
+    val isChecking by viewModel.checkingId.collectAsState()
+
+    // Debounce check: trigger after 500ms of no input
+    LaunchedEffect(idInput) {
+        delay(500)
+        if (idInput.length >= 4) {
+            viewModel.checkSafeSphereIdAvailability()
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.White)
             .statusBarsPadding()
+            .imePadding()
             .testTag("create_id_screen_root")
     ) {
         Column(
@@ -93,7 +113,6 @@ fun CreateIdScreen(
                             tint = Color(0xFF0F172A)
                         )
                     }
-
                     Text(
                         text = "Step 2 of 4",
                         fontSize = 12.sp,
@@ -112,16 +131,20 @@ fun CreateIdScreen(
                 )
 
                 Text(
-                    text = "Choose a unique ID for your account",
+                    text = "Choose a unique ID for your account (min. 4 characters)",
                     fontSize = 13.5.sp,
                     color = Color(0xFF64748B),
                     modifier = Modifier.padding(top = 4.dp, bottom = 28.dp)
                 )
 
-                // Input box with user icon prefix
                 OutlinedTextField(
                     value = idInput,
-                    onValueChange = { viewModel.safeSphereIdInput.value = it },
+                    onValueChange = {
+                        viewModel.safeSphereIdInput.value = it.lowercase().filter { c ->
+                            c.isLetterOrDigit() || c == '_'
+                        }
+                        viewModel.safeSphereIdAvailable.value = null
+                    },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Person,
@@ -129,6 +152,28 @@ fun CreateIdScreen(
                             tint = Color(0xFF94A3B8)
                         )
                     },
+                    trailingIcon = {
+                        when {
+                            isChecking -> CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFF64748B)
+                            )
+                            isAvailable == true -> Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Available",
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            isAvailable == false -> Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Taken",
+                                tint = Color(0xFFE11D48),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
+                    placeholder = { Text("e.g. alex_student", color = Color(0xFF94A3B8)) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
@@ -137,7 +182,11 @@ fun CreateIdScreen(
                         cursorColor = Color(0xFF1D61F2),
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        focusedIndicatorColor = Color(0xFF1D61F2),
+                        focusedIndicatorColor = when (isAvailable) {
+                            true -> Color(0xFF10B981)
+                            false -> Color(0xFFE11D48)
+                            null -> Color(0xFF1D61F2)
+                        },
                         unfocusedIndicatorColor = Color(0xFFCBD5E1)
                     ),
                     modifier = Modifier
@@ -147,36 +196,76 @@ fun CreateIdScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Green badge: ID available
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(16.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF10B981)),
-                        contentAlignment = Alignment.Center
+                // Status badge
+                when {
+                    isChecking -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Available",
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp)
+                            imageVector = Icons.Default.HourglassEmpty,
+                            contentDescription = null,
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text("Checking availability...", fontSize = 12.sp, color = Color(0xFF64748B))
+                    }
+                    isAvailable == true -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF10B981)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Available",
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                        Text(
+                            text = "ID available! ✓",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF059669)
                         )
                     }
-                    Text(
-                        text = "ID available",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF059669)
-                    )
+                    isAvailable == false -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE11D48)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Taken",
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                        Text(
+                            text = "ID already taken. Choose another.",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFE11D48)
+                        )
+                    }
                 }
             }
 
             Button(
                 onClick = onContinue,
+                enabled = isAvailable == true && idInput.length >= 4,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D61F2)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
@@ -199,12 +288,20 @@ fun CreatePasswordScreen(
     modifier: Modifier = Modifier
 ) {
     val password by viewModel.passwordInput.collectAsState()
+    var passwordVisible by remember { mutableStateOf(false) }
 
-    val checklist = listOf(
-        "At least 8 characters",
-        "One uppercase letter",
-        "One number",
-        "One special character"
+    // Real-time password strength checks
+    val hasLength = password.length >= 8
+    val hasUpper = password.any { it.isUpperCase() }
+    val hasDigit = password.any { it.isDigit() }
+    val hasSpecial = password.any { !it.isLetterOrDigit() }
+    val allValid = hasLength && hasUpper && hasDigit && hasSpecial
+
+    val checks = listOf(
+        "At least 8 characters" to hasLength,
+        "One uppercase letter" to hasUpper,
+        "One number" to hasDigit,
+        "One special character" to hasSpecial
     )
 
     Box(
@@ -212,6 +309,7 @@ fun CreatePasswordScreen(
             .fillMaxSize()
             .background(Color.White)
             .statusBarsPadding()
+            .imePadding()
             .testTag("create_password_screen_root")
     ) {
         Column(
@@ -235,7 +333,6 @@ fun CreatePasswordScreen(
                             tint = Color(0xFF0F172A)
                         )
                     }
-
                     Text(
                         text = "Step 3 of 4",
                         fontSize = 12.sp,
@@ -260,11 +357,10 @@ fun CreatePasswordScreen(
                     modifier = Modifier.padding(top = 4.dp, bottom = 28.dp)
                 )
 
-                // Password Input Box with Lock icon
                 OutlinedTextField(
                     value = password,
                     onValueChange = { viewModel.passwordInput.value = it },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     leadingIcon = {
                         Icon(
@@ -273,6 +369,16 @@ fun CreatePasswordScreen(
                             tint = Color(0xFF94A3B8)
                         )
                     },
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle visibility",
+                                tint = Color(0xFF94A3B8)
+                            )
+                        }
+                    },
+                    placeholder = { Text("Enter secure password", color = Color(0xFF94A3B8)) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
@@ -281,7 +387,7 @@ fun CreatePasswordScreen(
                         cursorColor = Color(0xFF1D61F2),
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        focusedIndicatorColor = Color(0xFF1D61F2),
+                        focusedIndicatorColor = if (allValid) Color(0xFF10B981) else Color(0xFF1D61F2),
                         unfocusedIndicatorColor = Color(0xFFCBD5E1)
                     ),
                     modifier = Modifier
@@ -291,9 +397,9 @@ fun CreatePasswordScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Checklist
+                // Real-time checklist
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    checklist.forEach { item ->
+                    checks.forEach { (label, passed) ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -302,21 +408,21 @@ fun CreatePasswordScreen(
                                 modifier = Modifier
                                     .size(16.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF10B981)),
+                                    .background(if (passed) Color(0xFF10B981) else Color(0xFFCBD5E1)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Valid",
+                                    imageVector = if (passed) Icons.Default.Check else Icons.Default.Close,
+                                    contentDescription = if (passed) "Valid" else "Invalid",
                                     tint = Color.White,
                                     modifier = Modifier.size(11.dp)
                                 )
                             }
                             Text(
-                                text = item,
+                                text = label,
                                 fontSize = 13.sp,
-                                color = Color(0xFF334155),
-                                fontWeight = FontWeight.Normal
+                                color = if (passed) Color(0xFF059669) else Color(0xFF334155),
+                                fontWeight = if (passed) FontWeight.Medium else FontWeight.Normal
                             )
                         }
                     }
@@ -325,6 +431,7 @@ fun CreatePasswordScreen(
 
             Button(
                 onClick = onContinue,
+                enabled = allValid,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D61F2)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
@@ -350,14 +457,19 @@ fun CompleteProfileScreen(
     val fullName by viewModel.fullNameInput.collectAsState()
     val gradeClass by viewModel.gradeClassInput.collectAsState()
     val selectedRole by viewModel.selectedRole.collectAsState()
+    val isLoading by viewModel.isDataLoading.collectAsState()
 
     var isRoleDropdownExpanded by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val canCreate = fullName.trim().isNotEmpty()
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.White)
             .statusBarsPadding()
+            .imePadding()
             .testTag("complete_profile_screen_root")
     ) {
         Column(
@@ -382,7 +494,6 @@ fun CompleteProfileScreen(
                             tint = Color(0xFF0F172A)
                         )
                     }
-
                     Text(
                         text = "Step 4 of 4",
                         fontSize = 12.sp,
@@ -402,15 +513,12 @@ fun CompleteProfileScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Avatar with camera badge overlay
+                // Avatar placeholder
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier.size(80.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.size(80.dp), contentAlignment = Alignment.Center) {
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
@@ -418,15 +526,22 @@ fun CompleteProfileScreen(
                                 .background(Color(0xFFE2E8F0)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Avatar placeholder",
-                                tint = Color(0xFF94A3B8),
-                                modifier = Modifier.size(50.dp)
-                            )
+                            if (fullName.isNotEmpty()) {
+                                Text(
+                                    text = fullName.firstOrNull()?.uppercase() ?: "?",
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF475569)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Avatar placeholder",
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier.size(50.dp)
+                                )
+                            }
                         }
-
-                        // Camera badge
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
@@ -450,7 +565,7 @@ fun CompleteProfileScreen(
 
                 // Full Name
                 Text(
-                    text = "Full Name",
+                    text = "Full Name *",
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFF475569)
@@ -459,6 +574,7 @@ fun CompleteProfileScreen(
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = { viewModel.fullNameInput.value = it },
+                    placeholder = { Text("Enter your full name", color = Color(0xFF94A3B8)) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
@@ -475,7 +591,7 @@ fun CompleteProfileScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Role Dropdown
+                // Role (read-only — carried from role selection)
                 Text(
                     text = "Role",
                     fontSize = 12.5.sp,
@@ -483,15 +599,38 @@ fun CompleteProfileScreen(
                     color = Color(0xFF475569)
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                ExposedDropdownMenuBox(
-                    expanded = isRoleDropdownExpanded,
-                    onExpandedChange = { isRoleDropdownExpanded = !isRoleDropdownExpanded }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF8FAFC))
+                        .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
+                    Text(
+                        text = if (selectedRole == UserRole.STUDENT) "Student / Child" else "Parent / Guardian",
+                        fontSize = 14.sp,
+                        color = Color(0xFF0F172A),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Grade / Class (optional for parents)
+                if (selectedRole == UserRole.STUDENT) {
+                    Text(
+                        text = "Grade / Class",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF475569)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
-                        value = if (selectedRole == UserRole.STUDENT) "Student" else "Parent / Guardian",
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isRoleDropdownExpanded) },
+                        value = gradeClass,
+                        onValueChange = { viewModel.gradeClassInput.value = it },
+                        placeholder = { Text("e.g. 10th Grade, Class 8", color = Color(0xFF94A3B8)) },
+                        singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = TextFieldDefaults.colors(
                             focusedTextColor = Color(0xFF0F172A),
@@ -502,64 +641,33 @@ fun CompleteProfileScreen(
                             focusedIndicatorColor = Color(0xFF1D61F2),
                             unfocusedIndicatorColor = Color(0xFFCBD5E1)
                         ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
+                        modifier = Modifier.fillMaxWidth()
                     )
-
-                    ExposedDropdownMenu(
-                        expanded = isRoleDropdownExpanded,
-                        onDismissRequest = { isRoleDropdownExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Student") },
-                            onClick = {
-                                viewModel.selectedRole.value = UserRole.STUDENT
-                                isRoleDropdownExpanded = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Parent / Guardian") },
-                            onClick = {
-                                viewModel.selectedRole.value = UserRole.PARENT
-                                isRoleDropdownExpanded = false
-                            }
-                        )
-                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Grade / Class
-                Text(
-                    text = "Grade / Class",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF475569)
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = gradeClass,
-                    onValueChange = { viewModel.gradeClassInput.value = it },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedTextColor = Color(0xFF0F172A),
-                        unfocusedTextColor = Color(0xFF0F172A),
-                        cursorColor = Color(0xFF1D61F2),
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedIndicatorColor = Color(0xFF1D61F2),
-                        unfocusedIndicatorColor = Color(0xFFCBD5E1)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Error
+                errorMessage?.let { err ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = err,
+                        fontSize = 12.sp,
+                        color = Color(0xFFE11D48),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = onCreateAccount,
+                onClick = {
+                    errorMessage = null
+                    viewModel.createRealAccount(
+                        onSuccess = onCreateAccount,
+                        onError = { errorMessage = it }
+                    )
+                },
+                enabled = canCreate && !isLoading,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D61F2)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
@@ -568,7 +676,15 @@ fun CompleteProfileScreen(
                     .padding(bottom = 12.dp)
                     .testTag("create_account_btn")
             ) {
-                Text("CREATE ACCOUNT", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("CREATE ACCOUNT", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
             }
         }
     }
