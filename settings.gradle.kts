@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "SafeSphere"
+rootProject.name = "SafeSphere Family"
 
 include(":app")
