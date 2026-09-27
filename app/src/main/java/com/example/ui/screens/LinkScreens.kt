@@ -70,6 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -202,7 +203,7 @@ fun LinkCodeGeneratorScreen(
                 if (isLoading && invite == null) {
                     CircularProgressIndicator(color = Color(0xFF4F46E5), modifier = Modifier.size(36.dp))
                 } else {
-                    val code = invite?.code ?: "SF-······"
+                    val code = invite?.code ?: "······"
                     Text(
                         text = code,
                         fontSize = 36.sp,
@@ -403,20 +404,23 @@ fun EnterLinkCodeScreen(
 
         OutlinedTextField(
             value = linkCode,
-            onValueChange = { viewModel.linkCodeInput.value = it.uppercase() },
-            label = { Text("6-Digit Code (e.g. SF-738291)") },
-            placeholder = { Text("SF-123456") },
+            onValueChange = { input ->
+                val digits = input.filter { it.isDigit() }.take(6)
+                viewModel.linkCodeInput.value = digits
+            },
+            label = { Text("6-Digit Numeric Code") },
+            placeholder = { Text("738291") },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),
             textStyle = androidx.compose.ui.text.TextStyle(
-                fontSize = 22.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                letterSpacing = 2.sp,
+                letterSpacing = 4.sp,
                 textAlign = TextAlign.Center
             ),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF2563EB),
                 unfocusedBorderColor = Color(0xFFCBD5E1)
@@ -467,7 +471,7 @@ fun EnterLinkCodeScreen(
                     viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
                 }
             },
-            enabled = linkCode.length >= 6 && !isDataLoading,
+            enabled = linkCode.length == 6 && !isDataLoading,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier

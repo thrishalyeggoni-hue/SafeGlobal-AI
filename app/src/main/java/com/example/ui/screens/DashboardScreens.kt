@@ -50,33 +50,45 @@ import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalTaxi
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Videocam
 import com.example.data.repository.FirestoreSafetyManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -197,6 +209,17 @@ fun ParentDashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val latestJourney by viewModel.latestJourney.collectAsState()
+    val firestoreProfile by viewModel.firestoreProfile.collectAsState()
+    var showAvatarDialog by remember { mutableStateOf(false) }
+    val parentAvatarIndex = firestoreProfile?.avatarIndex ?: 1
+
+    if (showAvatarDialog) {
+        com.example.ui.components.AvatarSelectionDialog(
+            currentAvatarIndex = parentAvatarIndex,
+            onAvatarSelected = { viewModel.updateUserAvatar(it) },
+            onDismissRequest = { showAvatarDialog = false }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -236,19 +259,22 @@ fun ParentDashboardScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(SARAH_AVATAR_URL)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Sarah Avatar",
-                        contentScale = ContentScale.Crop,
+                    Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(50.dp)
                             .clip(CircleShape)
-                    )
+                            .border(2.5.dp, Color(0xFF2563EB), CircleShape)
+                            .clickable { showAvatarDialog = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = com.example.ui.components.SafeSphereAvatarHelper.getAvatarDrawable(parentAvatarIndex)),
+                            contentDescription = "Parent Avatar - Tap to change",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    }
 
-                    val firestoreProfile by viewModel.firestoreProfile.collectAsState()
                     val parentDisplayName = firestoreProfile?.displayName.orEmpty().ifBlank { "Parent" }
 
                     Column {
@@ -1377,6 +1403,45 @@ fun StudentDashboardScreen(
     viewModel: SafeSphereViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val isTrackingActive by viewModel.isLocationTrackingActive.collectAsState()
+    val incomingCameraReq by viewModel.incomingCameraRequestForStudent.collectAsState()
+    val linkedParents by viewModel.linkedParents.collectAsState()
+    val studentActiveJourneys by viewModel.studentActiveJourneys.collectAsState()
+    val studentActiveRides by viewModel.studentActiveRides.collectAsState()
+    val generatedInvite by viewModel.generatedLinkInvite.collectAsState()
+
+    var showImOkShareDialog by remember { mutableStateOf(false) }
+    var showCodeShareDialog by remember { mutableStateOf(false) }
+    var showStudentAvatarDialog by remember { mutableStateOf(false) }
+
+    val studentProfile by viewModel.firestoreProfile.collectAsState()
+    val studentDisplayName = studentProfile?.displayName?.ifBlank { null } ?: "Student"
+    val studentAvatarIndex = studentProfile?.avatarIndex ?: 7
+
+    LaunchedEffect(studentProfile?.pairingCode) {
+        if (generatedInvite == null) {
+            viewModel.generateStudentLinkCode(forceRegenerate = false)
+        }
+    }
+
+    if (showStudentAvatarDialog) {
+        com.example.ui.components.AvatarSelectionDialog(
+            currentAvatarIndex = studentAvatarIndex,
+            onAvatarSelected = { viewModel.updateUserAvatar(it) },
+            onDismissRequest = { showStudentAvatarDialog = false }
+        )
+    }
+
+    val liveLoc by com.example.service.LocationTrackingService.currentLocation.collectAsState()
+    val studentLoc by viewModel.selectedStudentLocation.collectAsState()
+    val lat = liveLoc?.latitude ?: studentLoc?.latitude ?: 17.3850
+    val lng = liveLoc?.longitude ?: studentLoc?.longitude ?: 78.4867
+    val mapLink = "https://maps.google.com/?q=$lat,$lng"
+
+    val parentPhone = linkedParents.firstOrNull()?.parentPhone?.ifBlank { null }
+    val parentName = linkedParents.firstOrNull()?.parentName?.ifBlank { null } ?: "Mom"
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -1411,26 +1476,23 @@ fun StudentDashboardScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val studentProfile by viewModel.firestoreProfile.collectAsState()
-                val studentDisplayName = studentProfile?.displayName?.ifBlank { null } ?: "Student"
-                val linkedParents by viewModel.linkedParents.collectAsState()
-
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(50.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF006398)),
+                            .border(2.5.dp, Color(0xFF6366F1), CircleShape)
+                            .clickable { showStudentAvatarDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.School,
-                            contentDescription = "Student",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                        Image(
+                            painter = painterResource(id = com.example.ui.components.SafeSphereAvatarHelper.getAvatarDrawable(studentAvatarIndex)),
+                            contentDescription = "Student Avatar - Tap to change",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
                         )
                     }
 
@@ -1476,13 +1538,6 @@ fun StudentDashboardScreen(
                 }
             }
         }
-
-        val context = LocalContext.current
-        val isTrackingActive by viewModel.isLocationTrackingActive.collectAsState()
-        val incomingCameraReq by viewModel.incomingCameraRequestForStudent.collectAsState()
-        val linkedParents by viewModel.linkedParents.collectAsState()
-        val studentActiveJourneys by viewModel.studentActiveJourneys.collectAsState()
-        val studentActiveRides by viewModel.studentActiveRides.collectAsState()
 
         // 1. URGENT: Incoming Camera Check Request Dialog/Card
         if (incomingCameraReq != null) {
@@ -1599,50 +1654,143 @@ fun StudentDashboardScreen(
             }
         }
 
-        // 3. LINK WITH PARENT BUTTON
+        // 3. STUDENT LINK CODE FOR PARENT (DIRECT NUMERIC DISPLAY)
+        val studentCode = generatedInvite?.code?.filter { it.isDigit() }?.takeIf { it.length == 6 }
+            ?: studentProfile?.pairingCode?.filter { it.isDigit() }?.takeIf { it.length == 6 }
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { viewModel.navigateTo(ScreenDestination.LINK_CODE_GENERATOR) },
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFEEF2FF)),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F3FF)),
             border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF6366F1))
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF6366F1)),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Link, contentDescription = null, tint = Color.White)
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF6366F1)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.Link, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                        Column {
+                            Text(
+                                text = if (linkedParents.isNotEmpty()) "Linked to Guardian ✓" else "Student Family Link Code",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E1B4B)
+                            )
+                            Text(
+                                text = if (linkedParents.isNotEmpty()) "Connected to ${linkedParents.first().parentName}" else "Unique 6-digit number for your parent to connect",
+                                fontSize = 11.sp,
+                                color = Color(0xFF4338CA)
+                            )
+                        }
                     }
-                    Column {
-                        Text(
-                            text = if (linkedParents.isNotEmpty()) "Linked to Guardian ✓" else "Link Parent Phone",
-                            fontSize = 14.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1E1B4B)
-                        )
-                        Text(
-                            text = if (linkedParents.isNotEmpty()) "Connected to ${linkedParents.first().parentName}" else "Generate 6-digit code for your parent",
-                            fontSize = 11.5.sp,
-                            color = Color(0xFF4338CA)
-                        )
+
+                    // Refresh / regenerate code button
+                    IconButton(
+                        onClick = { viewModel.generateStudentLinkCode(forceRegenerate = true) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Regenerate", tint = Color(0xFF6366F1), modifier = Modifier.size(18.dp))
                     }
                 }
-                Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF6366F1))
+
+                // Display 6-digit numeric code in prominent individual digit boxes
+                if (studentCode != null && studentCode.length == 6) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        studentCode.forEach { digit ->
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .size(width = 40.dp, height = 48.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color.White)
+                                    .border(1.dp, Color(0xFFC7D2FE), RoundedCornerShape(10.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = digit.toString(),
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF312E81)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF6366F1), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Generating unique numeric code...", fontSize = 12.sp, color = Color(0xFF4338CA))
+                    }
+                }
+
+                // Action buttons: Share via WhatsApp & SMS or Copy
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { showCodeShareDialog = true },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                        enabled = studentCode != null
+                    ) {
+                        Icon(imageVector = Icons.Default.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Share Code", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            if (studentCode != null) {
+                                com.example.ui.components.SafetyShareHelper.copyToClipboard(context, studentCode, "Student Link Code")
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(0.8f)
+                            .height(38.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF818CF8)),
+                        enabled = studentCode != null
+                    ) {
+                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, tint = Color(0xFF4338CA), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Copy", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF4338CA))
+                    }
+                }
             }
         }
 
@@ -1746,7 +1894,10 @@ fun StudentDashboardScreen(
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { viewModel.triggerImOk() }
+                                modifier = Modifier.clickable {
+                                    viewModel.triggerImOk()
+                                    showImOkShareDialog = true
+                                }
                             ) {
                                 Text(
                                     text = "Send 'I'm OK' Ping",
@@ -2079,5 +2230,31 @@ fun StudentDashboardScreen(
         }
 
         Spacer(modifier = Modifier.height(60.dp))
+    }
+
+    if (showImOkShareDialog) {
+        val imOkMessage = "Hi $parentName, I wanted to let you know that I am safe and doing OK! 👍\nMy current location: $mapLink\n(Sent via SafeSphere Check-In)"
+        com.example.ui.components.SafetyShareDialog(
+            title = "Notify Parents - I'm OK",
+            subtitle = "Forward \"I'm OK\" status to parents via WhatsApp or SMS",
+            message = imOkMessage,
+            recipientName = parentName,
+            recipientPhone = parentPhone,
+            isImOk = true,
+            onDismiss = { showImOkShareDialog = false }
+        )
+    }
+
+    if (showCodeShareDialog && generatedInvite != null) {
+        val codeNum = generatedInvite!!.code.filter { it.isDigit() }
+        val codeMessage = "Hi Mom/Dad, connect with my SafeSphere student account using my unique link code: $codeNum\nOpen SafeSphere → Tap 'Enter Student's Code' to link with me!"
+        com.example.ui.components.SafetyShareDialog(
+            title = "Share Student Link Code",
+            subtitle = "Send your 6-digit connection code to your parents",
+            message = codeMessage,
+            recipientName = parentName,
+            recipientPhone = parentPhone,
+            onDismiss = { showCodeShareDialog = false }
+        )
     }
 }

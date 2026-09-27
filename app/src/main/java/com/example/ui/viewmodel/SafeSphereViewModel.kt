@@ -289,7 +289,15 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     init {
+        FirestoreUserManager.init(getApplication())
         checkPersistedSession()
+        viewModelScope.launch {
+            com.example.data.repository.FirestoreSafetyManager.safeZonesStateFlow.collect { map ->
+                if (map.isNotEmpty()) {
+                    _selectedStudentSafeZones.value = map.values.toList()
+                }
+            }
+        }
     }
 
     fun triggerDataSync() {
@@ -315,24 +323,38 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
             _isDataLoading.value = true
             _loadingStatus.value = "Loading your profile..."
 
-            val uid = FirebaseAuthManager.getEffectiveUid()
-            val profile = FirestoreUserManager.getUserProfile(uid)
+            // If profile is already set (by loginWithSafeSphereId), navigate directly
+            val existingProfile = _firestoreProfile.value
+            if (existingProfile != null) {
+                val role = existingProfile.toUserRole()
+                _activeDashboardRole.value = role
+                _loadingStatus.value = "Welcome back, ${existingProfile.displayName}!"
+                _isDataLoading.value = false
+                _currentScreen.value = if (role == UserRole.PARENT) ScreenDestination.PARENT_DASHBOARD
+                    else ScreenDestination.STUDENT_DASHBOARD
+                return@launch
+            }
+
+            // Fallback: Firebase Auth UID path (legacy)
+            val uid = try { FirebaseAuthManager.getEffectiveUid() } catch (_: Exception) { "" }
+            val profile = if (uid.isNotBlank()) {
+                try { FirestoreUserManager.getUserProfile(uid) } catch (_: Exception) { null }
+            } else null
             _isDataLoading.value = false
 
-            if (profile != null && profile.isProfileComplete) {
+            if (profile != null) {
                 _firestoreProfile.value = profile
                 val role = profile.toUserRole()
                 _activeDashboardRole.value = role
                 _loadingStatus.value = "Welcome back, ${profile.displayName}!"
                 initSafetyListenersForUser(uid, role)
-                if (role == UserRole.PARENT) {
-                    _currentScreen.value = ScreenDestination.PARENT_DASHBOARD
-                } else {
-                    _currentScreen.value = ScreenDestination.STUDENT_DASHBOARD
-                }
+                persistSessionLocally(uid, role, profile.displayName, profile.safeSphereId)
+                _currentScreen.value = if (role == UserRole.PARENT) ScreenDestination.PARENT_DASHBOARD
+                    else ScreenDestination.STUDENT_DASHBOARD
             } else {
-                // New user — proceed to role selection
-                _currentScreen.value = ScreenDestination.CHOOSE_ROLE
+                val role = _activeDashboardRole.value
+                _currentScreen.value = if (role == UserRole.PARENT) ScreenDestination.PARENT_DASHBOARD
+                    else ScreenDestination.STUDENT_DASHBOARD
             }
         }
     }
@@ -364,15 +386,12 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
             _isDataLoading.value = true
             _loadingStatus.value = "Creating your account..."
 
-            val user = FirebaseAuthManager.currentUser
             val entered = phoneInput.value.trim()
-            val phone = user?.phoneNumber ?: run {
-                if (entered.isNotEmpty()) "${countryCode.value.trim()}$entered" else (user?.email ?: "user_${System.currentTimeMillis()}")
-            }
-            val uid = FirebaseAuthManager.getEffectiveUid(phone)
+            val uid = "uid_${safeSphereIdInput.value.trim().lowercase().hashCode().toString().replace("-", "0")}_${System.currentTimeMillis() % 100000}"
 
             val name = fullNameInput.value.trim()
             val id = safeSphereIdInput.value.trim()
+            val password = passwordInput.value
             val grade = gradeClassInput.value.trim()
             val role = selectedRole.value
 
@@ -381,8 +400,26 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
                 onError("Name and SafeSphere ID are required.")
                 return@launch
             }
+            if (password.length < 6) {
+                _isDataLoading.value = false
+                onError("Password must be at least 6 characters.")
+                return@launch
+            }
 
-            // Immediately save to Room DB locally for instant responsiveness & offline capability
+            // Check SafeSphere ID availability
+            val isAvail = withTimeoutOrNull(4000L) {
+                FirestoreUserManager.isSafeSphereIdAvailable(id)
+            } ?: true
+            if (!isAvail) {
+                _isDataLoading.value = false
+                onError("SafeSphere ID '${id}' is already taken. Please choose another.")
+                return@launch
+            }
+
+            val passwordHash = FirestoreUserManager.hashPassword(password)
+            val phone = if (entered.isNotEmpty()) "${countryCode.value.trim()}$entered" else ""
+
+            // Save to Room DB locally
             val safeUser = SafeSphereUser(
                 id = uid,
                 phone = phone,
@@ -404,11 +441,15 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
                 safeSphereId = id,
                 familyId = FirestoreUserManager.generateFamilyId(),
                 isProfileComplete = true,
-                createdAt = System.currentTimeMillis()
+                createdAt = System.currentTimeMillis(),
+                passwordHash = passwordHash
             )
             _firestoreProfile.value = initialProfile
 
-            // Asynchronously sync to Firestore in background without blocking UI navigation
+            // Persist session in SharedPrefs so login is remembered
+            persistSessionLocally(uid, role)
+
+            // Asynchronously sync to Firestore in background
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     withTimeoutOrNull(4000L) {
@@ -520,56 +561,261 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /** Navigate to account creation flow (role already set in selectedRole) */
+    fun navigateToCreateAccount() {
+        _currentScreen.value = ScreenDestination.CREATE_ID
+    }
+
     /**
-     * Checks persisted Firebase Authentication session on app launch.
-     * Prevents showing login screen again if already authenticated.
+     * Login with SafeSphere ID + password (no email/Gmail required).
+     * Queries Firestore for matching safeSphereId, validates password hash.
+     * On success: persists session, initialises safety listeners, navigates to dashboard.
+     */
+    suspend fun loginWithSafeSphereId(
+        safeSphereId: String,
+        password: String,
+        expectedRole: UserRole,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        _isDataLoading.value = true
+        _loadingStatus.value = "Authenticating..."
+        val result = FirestoreUserManager.loginWithSafeSphereId(safeSphereId, password)
+        _isDataLoading.value = false
+        result.onSuccess { profile ->
+            val actualRole = profile.toUserRole()
+            // Auto-align role so role selector mismatch never blocks valid login
+            _activeDashboardRole.value = actualRole
+            selectedRole.value = actualRole
+            _firestoreProfile.value = profile
+
+            // Persist session in SharedPrefs for auto-login on next launch
+            persistSessionLocally(profile.uid, actualRole, profile.displayName, profile.safeSphereId)
+            initSafetyListenersForUser(profile.uid, actualRole)
+            _loadingStatus.value = "Welcome back, ${profile.displayName}!"
+            // If student, also start location tracking
+            if (actualRole == UserRole.STUDENT) {
+                val ctx = getApplication<android.app.Application>()
+                com.example.service.LocationTrackingService.startService(ctx, profile.uid, profile.displayName)
+            }
+
+            // Direct transition to dashboard immediately
+            _authSessionState.value = if (actualRole == UserRole.PARENT)
+                AuthSessionState.AUTHENTICATED_PARENT
+            else
+                AuthSessionState.AUTHENTICATED_STUDENT
+
+            _currentScreen.value = if (actualRole == UserRole.PARENT) {
+                ScreenDestination.PARENT_DASHBOARD
+            } else {
+                ScreenDestination.STUDENT_DASHBOARD
+            }
+
+            onSuccess()
+        }.onFailure { ex ->
+            val msg = ex.message ?: "Login failed. Please check your credentials."
+            loginErrorMessage.value = msg
+            onError(msg)
+        }
+    }
+
+    /**
+     * Instantly registers a new account with just the user's name and selected role.
+     * Grants immediate direct access to the app dashboard without intermediate
+     * pages or prompting for re-login.
+     */
+    suspend fun registerQuickAccount(
+        name: String,
+        role: UserRole,
+        avatarIndex: Int = 1,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) {
+            onError("Please enter your name.")
+            return
+        }
+        _isDataLoading.value = true
+        _loadingStatus.value = "Creating Account..."
+        val result = FirestoreUserManager.registerQuickAccount(cleanName, role, avatarIndex)
+        _isDataLoading.value = false
+        result.onSuccess { profile ->
+            _activeDashboardRole.value = role
+            selectedRole.value = role
+            _firestoreProfile.value = profile
+
+            persistSessionLocally(profile.uid, role, profile.displayName, profile.safeSphereId)
+            initSafetyListenersForUser(profile.uid, role)
+            _loadingStatus.value = "Welcome, ${profile.displayName}!"
+
+            if (role == UserRole.STUDENT) {
+                val ctx = getApplication<android.app.Application>()
+                com.example.service.LocationTrackingService.startService(ctx, profile.uid, profile.displayName)
+            }
+
+            _authSessionState.value = if (role == UserRole.PARENT)
+                AuthSessionState.AUTHENTICATED_PARENT
+            else
+                AuthSessionState.AUTHENTICATED_STUDENT
+
+            _currentScreen.value = if (role == UserRole.PARENT) {
+                ScreenDestination.PARENT_DASHBOARD
+            } else {
+                ScreenDestination.STUDENT_DASHBOARD
+            }
+
+            onSuccess()
+        }.onFailure { ex ->
+            val msg = ex.message ?: "Account creation failed. Please try again."
+            loginErrorMessage.value = msg
+            onError(msg)
+        }
+    }
+
+    /**
+     * Updates user's avatar selection from the 16 SafeSphere avatar portraits.
+     * Persists across Firestore and local Room cache.
+     */
+    fun updateUserAvatar(newAvatarIndex: Int) {
+        val safeIndex = newAvatarIndex.coerceIn(1, 16)
+        val current = _firestoreProfile.value ?: return
+        val updated = current.copy(avatarIndex = safeIndex)
+        _firestoreProfile.value = updated
+        viewModelScope.launch {
+            FirestoreUserManager.saveUserProfile(updated)
+            try {
+                val dbUser = SafeSphereUser(
+                    id = updated.uid,
+                    displayName = updated.displayName,
+                    role = updated.toUserRole(),
+                    safeSphereId = updated.safeSphereId,
+                    familyId = updated.familyId,
+                    avatarIndex = safeIndex,
+                    profilePhotoUrl = "avatar_$safeIndex"
+                )
+                repository.saveUser(dbUser)
+            } catch (_: Exception) {}
+        }
+    }
+
+    /** Save the current session to SharedPrefs for persistent login across app restarts. */
+    fun persistSessionLocally(uid: String, role: UserRole, displayName: String = "", safeSphereId: String = "") {
+        try {
+            getConsentPrefs().edit()
+                .putString("session_uid", uid)
+                .putString("session_role", role.name)
+                .putString("session_name", displayName)
+                .putString("session_safesphere_id", safeSphereId)
+                .putBoolean("has_active_session", true)
+                .apply()
+        } catch (e: Exception) { /* ignore */ }
+    }
+
+    /**
+     * Checks persisted session on app launch.
+     * First checks SharedPrefs (works without Firebase Auth), then Firebase.
+     * Prevents showing login screen again if already logged in.
      */
     fun checkPersistedSession() {
         viewModelScope.launch {
             _authSessionState.value = AuthSessionState.CHECKING_SESSION
+
+            val prefs = getConsentPrefs()
+            val hasActiveSession = prefs.getBoolean("has_active_session", false)
+            val cachedUid = prefs.getString("session_uid", null)
+            val cachedRoleStr = prefs.getString("session_role", null)
+            val cachedName = prefs.getString("session_name", "") ?: ""
+            val cachedId = prefs.getString("session_safesphere_id", "") ?: ""
+
+            if (hasActiveSession && !cachedUid.isNullOrBlank() && !cachedRoleStr.isNullOrBlank()) {
+                val cachedRole = try { UserRole.valueOf(cachedRoleStr) } catch (_: Exception) { null }
+                if (cachedRole != null) {
+                    val remoteProfile = try {
+                        withTimeoutOrNull(3000L) { FirestoreUserManager.getUserProfile(cachedUid) }
+                    } catch (_: Exception) { null }
+
+                    val profile = remoteProfile
+                        ?: FirestoreUserManager.getLocalProfile(cachedId.ifEmpty { cachedUid })
+                        ?: FirestoreUserManager.UserProfile(
+                            uid = cachedUid,
+                            role = cachedRole.name,
+                            displayName = cachedName.ifEmpty { if (cachedRole == UserRole.PARENT) "Parent Account" else "Student Account" },
+                            safeSphereId = cachedId,
+                            isProfileComplete = true
+                        )
+
+                    _firestoreProfile.value = profile
+                    _activeDashboardRole.value = cachedRole
+                    initSafetyListenersForUser(cachedUid, cachedRole)
+                    if (cachedRole == UserRole.STUDENT) {
+                        val ctx = getApplication<android.app.Application>()
+                        com.example.service.LocationTrackingService.startService(ctx, cachedUid, profile.displayName)
+                    }
+                    _authSessionState.value = if (cachedRole == UserRole.PARENT)
+                        AuthSessionState.AUTHENTICATED_PARENT
+                    else
+                        AuthSessionState.AUTHENTICATED_STUDENT
+
+                    _currentScreen.value = if (cachedRole == UserRole.PARENT)
+                        ScreenDestination.PARENT_DASHBOARD
+                    else
+                        ScreenDestination.STUDENT_DASHBOARD
+                    return@launch
+                }
+            }
+
+            // 2. Firebase Auth check as fallback
             val currentFirebaseUser = FirebaseAuthManager.currentUser
             if (currentFirebaseUser != null) {
                 val uid = currentFirebaseUser.uid
                 val profile = FirestoreUserManager.getUserProfile(uid)
-                if (profile != null && profile.isProfileComplete) {
+                if (profile != null) {
                     _firestoreProfile.value = profile
                     val role = profile.toUserRole()
                     _activeDashboardRole.value = role
+                    persistSessionLocally(uid, role, profile.displayName, profile.safeSphereId)
                     initSafetyListenersForUser(uid, role)
-                    if (role == UserRole.PARENT) {
-                        _authSessionState.value = AuthSessionState.AUTHENTICATED_PARENT
-                        if (_currentScreen.value != ScreenDestination.SPLASH) {
-                            _currentScreen.value = ScreenDestination.PARENT_DASHBOARD
-                        }
-                    } else {
-                        _authSessionState.value = AuthSessionState.AUTHENTICATED_STUDENT
-                        if (_currentScreen.value != ScreenDestination.SPLASH) {
-                            _currentScreen.value = ScreenDestination.STUDENT_DASHBOARD
-                        }
+                    if (role == UserRole.STUDENT) {
+                        val ctx = getApplication<android.app.Application>()
+                        com.example.service.LocationTrackingService.startService(ctx, uid, profile.displayName)
                     }
-                } else {
-                    // Firebase user exists but profile incomplete — let them finish setup
-                    _authSessionState.value = AuthSessionState.NOT_AUTHENTICATED
-                    if (_currentScreen.value != ScreenDestination.SPLASH) {
-                        _currentScreen.value = ScreenDestination.CHOOSE_ROLE
-                    }
-                }
-            } else {
-                _authSessionState.value = AuthSessionState.NOT_AUTHENTICATED
-                if (_currentScreen.value != ScreenDestination.SPLASH) {
-                    _currentScreen.value = if (hasAcceptedConsent()) ScreenDestination.LOGIN else ScreenDestination.CONSENT
+                    _authSessionState.value = if (role == UserRole.PARENT)
+                        AuthSessionState.AUTHENTICATED_PARENT
+                    else
+                        AuthSessionState.AUTHENTICATED_STUDENT
+
+                    _currentScreen.value = if (role == UserRole.PARENT)
+                        ScreenDestination.PARENT_DASHBOARD
+                    else
+                        ScreenDestination.STUDENT_DASHBOARD
+                    return@launch
                 }
             }
+
+            _authSessionState.value = AuthSessionState.NOT_AUTHENTICATED
         }
     }
 
     /**
      * Explicit user logout.
-     * Signs out of Firebase Auth, clears local in-memory UI inputs, navigates to Login.
-     * Crucially: Does NOT delete user profile, family links, safe zones, or journey records in Firestore.
+     * Clears session from SharedPrefs and Firebase, navigates to Login.
+     * Does NOT delete user profile, family links, safe zones, or journey records.
      */
     fun logout() {
         FirebaseAuthManager.signOut()
+        // Clear persisted session so auto-login does not trigger
+        try {
+            getConsentPrefs().edit()
+                .remove("session_uid")
+                .remove("session_role")
+                .putBoolean("has_active_session", false)
+                .apply()
+        } catch (e: Exception) { /* ignore */ }
+        // Stop location tracking if running
+        try {
+            com.example.service.LocationTrackingService.stopService(getApplication())
+        } catch (e: Exception) { /* ignore */ }
         // Clear local state
         phoneInput.value = ""
         otpInputs.value = List(6) { "" }
@@ -579,6 +825,7 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
         gradeClassInput.value = ""
         linkCodeInput.value = ""
         linkErrorMessage.value = null
+        loginErrorMessage.value = null
         _linkSuccessMessage.value = null
         _generatedLinkInvite.value = null
         _incomingLinkRequestForStudent.value = null
@@ -901,6 +1148,11 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
                     expectedSchedule = "Active Schedule"
                 )
             )
+            // Also sync to FirestoreSafeZone so map immediately displays this safe zone
+            val match = Regex("""\(([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+)\)""").find(address)
+            val lat = match?.groupValues?.get(1)?.toDoubleOrNull() ?: _selectedStudentLocation.value?.latitude ?: 17.3850
+            val lng = match?.groupValues?.get(2)?.toDoubleOrNull() ?: _selectedStudentLocation.value?.longitude ?: 78.4867
+            createFirestoreSafeZone(name = name, lat = lat, lng = lng, radius = radius.toDouble())
         }
     }
 
@@ -978,14 +1230,25 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // ── Phase 2: Family Linking (Mutual Consent & Persistence) ────────
-    fun generateStudentLinkCode() {
+    fun generateStudentLinkCode(forceRegenerate: Boolean = false) {
         viewModelScope.launch {
             _isDataLoading.value = true
             _loadingStatus.value = "Generating Link Code..."
-            // Generate clean 6-digit code
-            val codeNum = (100000..999999).random().toString()
 
             val profile = _firestoreProfile.value
+            val existingCode = profile?.pairingCode?.filter { it.isDigit() }?.takeIf { it.length == 6 }
+            val codeNum = if (!forceRegenerate && existingCode != null) {
+                existingCode
+            } else {
+                val newNum = (100000..999999).random().toString()
+                if (profile != null) {
+                    val updated = profile.copy(pairingCode = newNum)
+                    _firestoreProfile.value = updated
+                    launch { FirestoreUserManager.saveUserProfile(updated) }
+                }
+                newNum
+            }
+
             val phone = profile?.phone.orEmpty().ifBlank { "${countryCode.value}${phoneInput.value}" }
             val uid = profile?.uid ?: FirebaseAuthManager.getEffectiveUid(phone)
             val name = profile?.displayName.orEmpty().ifBlank { fullNameInput.value.ifBlank { "Student" } }
@@ -999,7 +1262,7 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
                 studentSafeSphereId = safeSphereId,
                 status = "PENDING",
                 createdAt = System.currentTimeMillis(),
-                expiresAt = System.currentTimeMillis() + 10 * 60 * 1000L
+                expiresAt = System.currentTimeMillis() + 24 * 60 * 60 * 1000L // 24 hours valid for dashboard
             )
 
             val res = com.example.data.repository.FirestoreSafetyManager.createLinkInvite(invite)
@@ -1281,6 +1544,10 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
                 createdAt = System.currentTimeMillis()
             )
             com.example.data.repository.FirestoreSafetyManager.saveSafeZone(zone)
+            val currentList = _selectedStudentSafeZones.value.toMutableList()
+            currentList.removeAll { it.zoneId == zoneId }
+            currentList.add(zone)
+            _selectedStudentSafeZones.value = currentList
             repository.addSafeZone(
                 SafeZone(
                     id = 0L,
@@ -1302,6 +1569,9 @@ class SafeSphereViewModel(application: Application) : AndroidViewModel(applicati
     fun deleteFirestoreSafeZone(zoneId: String) {
         viewModelScope.launch {
             com.example.data.repository.FirestoreSafetyManager.deleteSafeZone(zoneId)
+            val currentList = _selectedStudentSafeZones.value.toMutableList()
+            currentList.removeAll { it.zoneId == zoneId }
+            _selectedStudentSafeZones.value = currentList
         }
     }
 

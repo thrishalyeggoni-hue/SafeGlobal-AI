@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
         TimelineEvent::class,
         EmergencySettings::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class SafeSphereDatabase : RoomDatabase() {

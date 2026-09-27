@@ -42,6 +42,7 @@ data class SafeSphereUser(
     val profilePhotoUrl: String = "",
     val familyId: String = "",
     val pairingCode: String = "",
+    val avatarIndex: Int = 1,
     val themeColorHex: String = "#1652F0",
     val isPhoneVerified: Boolean = true,
     val hasAcceptedConsent: Boolean = true

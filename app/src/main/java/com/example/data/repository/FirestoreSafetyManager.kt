@@ -195,7 +195,7 @@ object FirestoreSafetyManager {
     private val invitesStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, LinkInvite>>(emptyMap())
     private val familyLinksStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, FamilyLink>>(emptyMap())
     private val locationsStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, LiveLocation>>(emptyMap())
-    private val safeZonesStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, FirestoreSafeZone>>(emptyMap())
+    val safeZonesStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, FirestoreSafeZone>>(emptyMap())
     private val geofenceEventsStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, FirestoreGeofenceEvent>>(emptyMap())
     private val cameraRequestsStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, CameraRequest>>(emptyMap())
     private val cameraSessionsStateFlow = kotlinx.coroutines.flow.MutableStateFlow<Map<String, CameraSession>>(emptyMap())

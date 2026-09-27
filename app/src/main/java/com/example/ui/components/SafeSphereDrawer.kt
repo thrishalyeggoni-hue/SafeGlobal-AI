@@ -3,8 +3,12 @@ package com.example.ui.components
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -160,18 +164,20 @@ fun SafeSphereDrawer(
                     ) {
                         Column {
                             // Avatar circle
+                            val userAvatarIndex = firestoreProfile?.avatarIndex ?: if (isParent) 1 else 7
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
+                                    .size(60.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.2f)),
+                                    .background(Color.White.copy(alpha = 0.2f))
+                                    .border(2.dp, Color.White, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = displayName.firstOrNull()?.uppercase() ?: "?",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                Image(
+                                    painter = painterResource(id = SafeSphereAvatarHelper.getAvatarDrawable(userAvatarIndex)),
+                                    contentDescription = "Avatar",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
                                 )
                             }
                             Spacer(modifier = Modifier.height(10.dp))

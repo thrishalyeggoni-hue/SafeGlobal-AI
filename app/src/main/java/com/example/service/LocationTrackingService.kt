@@ -67,23 +67,44 @@ class LocationTrackingService : Service() {
         val currentLocation = _currentLocation.asStateFlow()
 
         fun startService(context: Context, studentUid: String, studentName: String) {
+            val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!hasFine && !hasCoarse) {
+                android.util.Log.w("LocationTrackingService", "Cannot start LocationTrackingService: location permission not granted")
+                return
+            }
+
             val intent = Intent(context, LocationTrackingService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_STUDENT_UID, studentUid)
                 putExtra(EXTRA_STUDENT_NAME, studentName)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("LocationTrackingService", "Failed to start service", e)
             }
         }
 
         fun stopService(context: Context) {
-            val intent = Intent(context, LocationTrackingService::class.java).apply {
-                action = ACTION_STOP
+            try {
+                val intent = Intent(context, LocationTrackingService::class.java).apply {
+                    action = ACTION_STOP
+                }
+                context.startService(intent)
+            } catch (e: Exception) {
+                android.util.Log.e("LocationTrackingService", "Failed to stop service", e)
             }
-            context.startService(intent)
         }
     }
 
@@ -126,7 +147,16 @@ class LocationTrackingService : Service() {
                 val wasTracking = prefs.getBoolean(PREF_KEY_IS_TRACKING, false)
                 val savedUid = prefs.getString(PREF_KEY_STUDENT_UID, null)
                 val savedName = prefs.getString(PREF_KEY_STUDENT_NAME, "Student") ?: "Student"
-                if (wasTracking && !savedUid.isNullOrBlank()) {
+                val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                if (wasTracking && !savedUid.isNullOrBlank() && (hasFine || hasCoarse)) {
                     studentUid = savedUid
                     studentName = savedName
                     startForegroundTracking()
@@ -174,15 +204,36 @@ class LocationTrackingService : Service() {
 
     @SuppressLint("MissingPermission")
     private fun startForegroundTracking() {
-        val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasFine && !hasCoarse) {
+            android.util.Log.w("LocationTrackingService", "Cannot start location FGS: permissions not granted")
+            stopSelf()
+            return
+        }
+
+        try {
+            val notification = buildNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("LocationTrackingService", "Failed to start foreground service", e)
+            stopSelf()
+            return
         }
 
         _isTrackingActive.value = true

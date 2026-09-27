@@ -1,7 +1,11 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,11 +37,13 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.icons.filled.AddLink
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.filled.Verified
@@ -94,6 +100,8 @@ fun SettingsScreen(
     var isCameraVerificationOn by remember { mutableStateOf(true) }
     var isGeofenceAlertsOn by remember { mutableStateOf(true) }
     var showColorPicker by remember { mutableStateOf(false) }
+    var showAccountDetailsDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -122,6 +130,20 @@ fun SettingsScreen(
             Text(text = "Settings", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF121C2A))
         }
 
+        val profile by viewModel.firestoreProfile.collectAsState()
+
+        if (showAccountDetailsDialog) {
+            AccountDetailsDialog(
+                profile = profile,
+                isParent = isParent,
+                onDismiss = { showAccountDetailsDialog = false },
+                onEditProfile = {
+                    showAccountDetailsDialog = false
+                    viewModel.navigateTo(ScreenDestination.COMPLETE_PROFILE)
+                }
+            )
+        }
+
         // Account Section
         Text(text = "ACCOUNT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF474552), letterSpacing = 0.5.sp)
         Card(
@@ -135,6 +157,12 @@ fun SettingsScreen(
                     icon = Icons.Default.Person,
                     onClick = { viewModel.navigateTo(ScreenDestination.PROFILE) }
                 )
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
+                SettingRowItem(
+                    title = "Account Details",
+                    icon = Icons.Default.Badge,
+                    onClick = { showAccountDetailsDialog = true }
+                )
                 if (isParent) {
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
                     SettingRowItem(
@@ -147,6 +175,7 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable { showAccountDetailsDialog = true }
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -158,7 +187,12 @@ fun SettingsScreen(
                         Icon(imageVector = Icons.Default.Badge, contentDescription = "SafeSphere ID", tint = MaterialTheme.colorScheme.primary)
                         Text(text = "SafeSphere ID", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF121C2A))
                     }
-                    Text(text = "#SF-9042", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF006398))
+                    Text(
+                        text = profile?.safeSphereId?.ifBlank { "#SF-9042" } ?: "#SF-9042",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF006398)
+                    )
                 }
             }
         }
@@ -255,7 +289,75 @@ fun SettingsScreen(
             }
         }
 
+        // Log Out Button
+        OutlinedButton(
+            onClick = { showLogoutDialog = true },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFBA1A1A)),
+            border = BorderStroke(1.dp, Color(0xFFFFDAD6)),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .testTag("settings_logout_btn")
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(imageVector = Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Log Out", tint = Color(0xFFBA1A1A))
+                Text(
+                    text = "Log Out",
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFBA1A1A)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(70.dp))
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            icon = {
+                Icon(
+                    Icons.AutoMirrored.Filled.ExitToApp,
+                    contentDescription = null,
+                    tint = Color(0xFFBA1A1A),
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text("Log out of SafeSphere?", fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+            },
+            text = {
+                Text(
+                    "Are you sure you want to log out? Your family connections, safe zones, and safety history will remain securely saved in your account.",
+                    color = Color(0xFF474552),
+                    fontSize = 13.5.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        viewModel.logout()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBA1A1A)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Log Out", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancel", color = Color(0xFF474552))
+                }
+            },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(20.dp)
+        )
     }
 
     if (showColorPicker) {
@@ -967,6 +1069,29 @@ fun ProfileScreen(
         val isParent = viewModel.activeDashboardRole.collectAsState().value == com.example.data.model.UserRole.PARENT
         val profile by viewModel.firestoreProfile.collectAsState()
         var showLogoutDialog by remember { mutableStateOf(false) }
+        var showAccountDetailsDialog by remember { mutableStateOf(false) }
+        var showAvatarDialog by remember { mutableStateOf(false) }
+        val userAvatarIndex = profile?.avatarIndex ?: if (isParent) 1 else 7
+
+        if (showAvatarDialog) {
+            com.example.ui.components.AvatarSelectionDialog(
+                currentAvatarIndex = userAvatarIndex,
+                onAvatarSelected = { viewModel.updateUserAvatar(it) },
+                onDismissRequest = { showAvatarDialog = false }
+            )
+        }
+
+        if (showAccountDetailsDialog) {
+            AccountDetailsDialog(
+                profile = profile,
+                isParent = isParent,
+                onDismiss = { showAccountDetailsDialog = false },
+                onEditProfile = {
+                    showAccountDetailsDialog = false
+                    viewModel.navigateTo(ScreenDestination.COMPLETE_PROFILE)
+                }
+            )
+        }
 
         if (showLogoutDialog) {
             AlertDialog(
@@ -1042,16 +1167,36 @@ fun ProfileScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(76.dp)
                         .clip(CircleShape)
-                        .background(if (isParent) Color(0xFFDBEAFE) else Color(0xFFDCFCE7)),
+                        .border(3.dp, if (isParent) Color(0xFF2563EB) else Color(0xFF16A34A), CircleShape)
+                        .clickable { showAvatarDialog = true },
                     contentAlignment = Alignment.Center
                 ) {
+                    Image(
+                        painter = painterResource(id = com.example.ui.components.SafeSphereAvatarHelper.getAvatarDrawable(userAvatarIndex)),
+                        contentDescription = "Profile Avatar - Tap to change",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                }
+
+                TextButton(
+                    onClick = { showAvatarDialog = true },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = if (isParent) Color(0xFF2563EB) else Color(0xFF16A34A),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = (profile?.displayName?.take(1)?.uppercase() ?: if (isParent) "P" else "S"),
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        color = if (isParent) Color(0xFF1D4ED8) else Color(0xFF15803D)
+                        text = "Change Avatar",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isParent) Color(0xFF2563EB) else Color(0xFF16A34A)
                     )
                 }
 
@@ -1075,7 +1220,7 @@ fun ProfileScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                SettingRowItem(title = "Account Details", icon = Icons.Default.Person, onClick = {})
+                SettingRowItem(title = "Account Details", icon = Icons.Default.Person, onClick = { showAccountDetailsDialog = true })
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
                 SettingRowItem(title = "Journey History", icon = Icons.Default.ShareLocation, onClick = { viewModel.navigateTo(ScreenDestination.SAFETY_TIMELINE) })
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEFF4FF)))
@@ -1098,5 +1243,173 @@ fun ProfileScreen(
         }
 
         Spacer(modifier = Modifier.height(70.dp))
+    }
+}
+
+@Composable
+fun AccountDetailsDialog(
+    profile: com.example.data.auth.FirestoreUserManager.UserProfile?,
+    isParent: Boolean,
+    onDismiss: () -> Unit,
+    onEditProfile: () -> Unit
+) {
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val safeSphereId = profile?.safeSphereId?.ifBlank { "Not set" } ?: "Not set"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(if (isParent) Color(0xFFDBEAFE) else Color(0xFFDCFCE7)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Badge,
+                        contentDescription = null,
+                        tint = if (isParent) Color(0xFF1D4ED8) else Color(0xFF15803D),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        text = "Account Details",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    Text(
+                        text = "SafeSphere Credentials & Security",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // SafeSphere ID highlight card
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFF1F5F9))
+                        .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(14.dp))
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("SafeSphere ID", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF64748B))
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = safeSphereId,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E293B)
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(safeSphereId))
+                                android.widget.Toast.makeText(context, "SafeSphere ID copied to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy ID",
+                                tint = Color(0xFF1D61F2),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Account items
+                AccountDetailRow(label = "Full Name", value = profile?.displayName?.ifBlank { "SafeSphere User" } ?: "SafeSphere User")
+                AccountDetailRow(label = "Account Role", value = if (isParent) "Primary Parent / Guardian" else "Student / Child")
+                if (!isParent && !profile?.gradeClass.isNullOrBlank()) {
+                    AccountDetailRow(label = "Grade / Class", value = profile?.gradeClass ?: "")
+                }
+                if (!profile?.phone.isNullOrBlank()) {
+                    AccountDetailRow(label = "Phone Number", value = profile?.phone ?: "")
+                }
+                AccountDetailRow(label = "Family ID", value = profile?.familyId?.ifBlank { "SF-FAMILY-01" } ?: "SF-FAMILY-01")
+
+                // Status badges
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFFDCFCE7))
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Verified, null, tint = Color(0xFF15803D), modifier = Modifier.size(14.dp))
+                            Text("Cloud Synced", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF15803D))
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFFEFF6FF))
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Security, null, tint = Color(0xFF1D4ED8), modifier = Modifier.size(14.dp))
+                            Text("SHA-256 Auth", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D4ED8))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D61F2)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Close", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onEditProfile) {
+                Text("Edit Profile", color = Color(0xFF1D61F2), fontWeight = FontWeight.SemiBold)
+            }
+        },
+        shape = RoundedCornerShape(22.dp),
+        containerColor = Color.White
+    )
+}
+
+@Composable
+private fun AccountDetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 12.5.sp, color = Color(0xFF64748B))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1E293B))
     }
 }

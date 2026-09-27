@@ -136,7 +136,16 @@ fun FamilyMapScreen(
     var newZoneRadius by remember { mutableFloatStateOf(200f) }
     var newZoneAlertOnExit by remember { mutableStateOf(true) }
     var showCameraSelectDialog by remember { mutableStateOf(false) }
+    var showShareLocationDialog by remember { mutableStateOf(false) }
+    var showImOkDialog by remember { mutableStateOf(false) }
     val activeGeofenceAlert by viewModel.activeGeofenceAlert.collectAsState()
+
+    val gpsLoc by com.example.service.LocationTrackingService.currentLocation.collectAsState()
+    val mapLat = gpsLoc?.latitude ?: liveLoc?.latitude ?: 17.3850
+    val mapLng = gpsLoc?.longitude ?: liveLoc?.longitude ?: 78.4867
+    val mapLink = "https://maps.google.com/?q=$mapLat,$mapLng"
+    val parentPhone = linkedParents.firstOrNull()?.parentPhone?.ifBlank { null }
+    val parentName = linkedParents.firstOrNull()?.parentName?.ifBlank { null } ?: "Mom"
 
     if (isFullscreenMap) {
         // Full Field View (100vh) for Leaflet Map
@@ -861,7 +870,7 @@ fun FamilyMapScreen(
                             }
 
                             IconButton(
-                                onClick = { viewModel.triggerImOk() },
+                                onClick = { showShareLocationDialog = true },
                                 modifier = Modifier
                                     .size(44.dp)
                                     .clip(CircleShape)
@@ -1009,7 +1018,10 @@ fun FamilyMapScreen(
                         }
 
                         Button(
-                            onClick = { viewModel.triggerImOk() },
+                            onClick = {
+                                viewModel.triggerImOk()
+                                showImOkDialog = true
+                            },
                             shape = RoundedCornerShape(24.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006B49)),
                             modifier = Modifier.fillMaxWidth().height(44.dp)
@@ -1231,6 +1243,13 @@ fun FamilyMapScreen(
                 Button(
                     onClick = {
                         val name = newZoneName.ifBlank { "Safe Zone" }
+                        val zoneId = "zone_${System.currentTimeMillis()}"
+                        val safeNameEscaped = name.replace("'", "\\'")
+                        // Immediately draw safe zone circle on map
+                        val drawJs = "if (window.addSafeZoneCircle) { window.addSafeZoneCircle('$zoneId', '$safeNameEscaped', $lat, $lng, ${newZoneRadius}); }"
+                        webViewRef?.evaluateJavascript(drawJs, null)
+                        webViewRef?.evaluateJavascript("if (window.clearTempMark) window.clearTempMark();", null)
+
                         viewModel.createFirestoreSafeZone(
                             name = name,
                             lat = lat,
@@ -1241,7 +1260,6 @@ fun FamilyMapScreen(
                         markedLocation = null
                         isMarkingSafeZone = false
                         newZoneName = ""
-                        webViewRef?.evaluateJavascript("if (window.clearTempMark) window.clearTempMark();", null)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006B49)),
                     shape = RoundedCornerShape(12.dp)
@@ -1329,6 +1347,32 @@ fun FamilyMapScreen(
             containerColor = Color.White
         )
     }
+
+    if (showShareLocationDialog) {
+        val sosMessage = "🚨 EMERGENCY SOS! I need help immediately. My current live location is: $mapLink\n(Sent via SafeSphere Emergency)"
+        com.example.ui.components.SafetyShareDialog(
+            title = "Share Live Location",
+            subtitle = "Send emergency GPS location to your parents & contacts",
+            message = sosMessage,
+            recipientName = parentName,
+            recipientPhone = parentPhone,
+            isEmergency = true,
+            onDismiss = { showShareLocationDialog = false }
+        )
+    }
+
+    if (showImOkDialog) {
+        val imOkMessage = "Hi $parentName, I wanted to let you know that I am safe and doing OK! 👍\nMy current location: $mapLink\n(Sent via SafeSphere Check-In)"
+        com.example.ui.components.SafetyShareDialog(
+            title = "Notify Parents - I'm OK",
+            subtitle = "Forward \"I'm OK\" status to parents via WhatsApp or SMS",
+            message = imOkMessage,
+            recipientName = parentName,
+            recipientPhone = parentPhone,
+            isImOk = true,
+            onDismiss = { showImOkDialog = false }
+        )
+    }
 }
 
 /**
@@ -1381,20 +1425,34 @@ fun LeafletMapView(
         webViewRef?.evaluateJavascript(js, null)
     }
 
+    // Reactive update for safe-zone circles: dynamically draw safe zones on Leaflet
+    LaunchedEffect(safeZones, webViewRef) {
+        webViewRef?.let { wv ->
+            safeZones.forEach { zone ->
+                val safeName = zone.name.replace("'", "\\'")
+                val js = "if (window.addSafeZoneCircle) { window.addSafeZoneCircle('${zone.zoneId}', '$safeName', ${zone.latitude}, ${zone.longitude}, ${zone.radiusMeters}); }"
+                wv.evaluateJavascript(js, null)
+            }
+        }
+    }
+
     val safeZonesJs = remember(safeZones) {
         if (safeZones.isEmpty()) {
             "// No safe zones configured yet"
         } else {
             safeZones.joinToString("\n") { zone ->
+                val safeKey = zone.zoneId.replace(Regex("[^a-zA-Z0-9_]"), "_")
+                val safeName = zone.name.replace("'", "\\'")
                 """
-                const zone_${zone.zoneId.replace("-", "_")} = L.circle([${zone.latitude}, ${zone.longitude}], {
+                const zone_$safeKey = L.circle([${zone.latitude}, ${zone.longitude}], {
                     radius: ${zone.radiusMeters},
                     color: '#059669',
                     fillColor: '#10B981',
-                    fillOpacity: 0.22,
-                    weight: 2
+                    fillOpacity: 0.28,
+                    weight: 2.5
                 }).addTo(map);
-                zone_${zone.zoneId.replace("-", "_")}.bindPopup("<b>🛡️ ${zone.name}</b><br>Radius: ${zone.radiusMeters}m");
+                zone_$safeKey.bindPopup("<b>🛡️ $safeName</b><br>Safe Perimeter: ${zone.radiusMeters}m");
+                if (window.safeZoneLayers) { window.safeZoneLayers['zone_$safeKey'] = zone_$safeKey; }
                 """.trimIndent()
             }
         }
@@ -1639,6 +1697,31 @@ fun LeafletMapView(
                     }
                 };
 
+                window.safeZoneLayers = {};
+
+                window.addSafeZoneCircle = function(zoneId, name, lat, lng, radius) {
+                    if (!map) return;
+                    var safeKey = 'zone_' + String(zoneId).replace(/[^a-zA-Z0-9_]/g, '_');
+                    if (window.safeZoneLayers && window.safeZoneLayers[safeKey]) {
+                        try { map.removeLayer(window.safeZoneLayers[safeKey]); } catch(e){}
+                    }
+                    var circle = L.circle([lat, lng], {
+                        radius: radius,
+                        color: '#059669',
+                        fillColor: '#10B981',
+                        fillOpacity: 0.28,
+                        weight: 2.5
+                    }).addTo(map);
+                    circle.bindPopup("<b>🛡️ " + name + "</b><br>Safe Perimeter: " + radius + "m");
+                    if (!window.safeZoneLayers) window.safeZoneLayers = {};
+                    window.safeZoneLayers[safeKey] = circle;
+                };
+
+                window.clearTempMark = function() {
+                    if (tempMarkMarker && map) { map.removeLayer(tempMarkMarker); tempMarkMarker = null; }
+                    if (tempMarkCircle && map) { map.removeLayer(tempMarkCircle); tempMarkCircle = null; }
+                };
+
                 function pollForLeaflet(attempts) {
                     if (typeof L !== 'undefined' && typeof L.map === 'function') {
                         initMap();
@@ -1735,6 +1818,10 @@ fun LeafletMapView(
                             })()
                         """) { res ->
                             Log.e("SafeSphereDiagnostic", "MAP_INSPECT: $res")
+                        }
+                        safeZones.forEach { zone ->
+                            val safeName = zone.name.replace("'", "\\'")
+                            view?.evaluateJavascript("if (window.addSafeZoneCircle) { window.addSafeZoneCircle('${zone.zoneId}', '$safeName', ${zone.latitude}, ${zone.longitude}, ${zone.radiusMeters}); }", null)
                         }
                     }
 

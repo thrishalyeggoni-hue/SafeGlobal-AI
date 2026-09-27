@@ -965,6 +965,22 @@ fun EmergencyScreen(
     var enteredPin by remember { mutableStateOf("") }
     var pinMessage by remember { mutableStateOf<String?>(null) }
 
+    var showShareLocationDialog by remember { mutableStateOf(false) }
+    var showNotifyParentsDialog by remember { mutableStateOf(false) }
+
+    val liveLoc by com.example.service.LocationTrackingService.currentLocation.collectAsState()
+    val studentLoc by viewModel.selectedStudentLocation.collectAsState()
+    val lat = liveLoc?.latitude ?: studentLoc?.latitude ?: 17.3850
+    val lng = liveLoc?.longitude ?: studentLoc?.longitude ?: 78.4867
+    val mapLink = "https://maps.google.com/?q=$lat,$lng"
+
+    val linkedParents by viewModel.linkedParents.collectAsState()
+    val emergencySettings by viewModel.emergencySettings.collectAsState()
+    val parentPhone = linkedParents.firstOrNull()?.parentPhone?.ifBlank { null }
+        ?: emergencySettings?.trustedContactPhone?.ifBlank { null }
+    val parentName = linkedParents.firstOrNull()?.parentName?.ifBlank { null }
+        ?: emergencySettings?.trustedContactName?.ifBlank { null } ?: "Mom"
+
     val infiniteTransition = rememberInfiniteTransition(label = "sos_pulse")
     val pulseSize by infiniteTransition.animateFloat(
         initialValue = 0.96f,
@@ -1023,7 +1039,10 @@ fun EmergencyScreen(
                     .size(130.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFBA1A1A))
-                    .clickable { viewModel.triggerSosEmergency() }
+                    .clickable {
+                        viewModel.triggerSosEmergency()
+                        showShareLocationDialog = true
+                    }
                     .testTag("sos_emergency_btn"),
                 contentAlignment = Alignment.Center
             ) {
@@ -1052,7 +1071,7 @@ fun EmergencyScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                modifier = Modifier.clickable { viewModel.triggerImOk() }
+                modifier = Modifier.clickable { showShareLocationDialog = true }
             ) {
                 Row(
                     modifier = Modifier
@@ -1081,7 +1100,6 @@ fun EmergencyScreen(
             }
 
             // Call Trusted Contact
-            val emergencySettings by viewModel.emergencySettings.collectAsState()
             val contactPhone = emergencySettings?.trustedContactPhone?.ifBlank { null }
             val contactName = emergencySettings?.trustedContactName?.ifBlank { null }
             val contactLabel = if (contactPhone != null && contactName != null) "Call $contactName" else if (contactPhone != null) "Call Trusted Contact" else "Call Emergency Helpline (112)"
@@ -1127,7 +1145,10 @@ fun EmergencyScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                modifier = Modifier.clickable { viewModel.triggerImOk() }
+                modifier = Modifier.clickable {
+                    viewModel.triggerImOk()
+                    showNotifyParentsDialog = true
+                }
             ) {
                 Row(
                     modifier = Modifier
@@ -1249,6 +1270,32 @@ fun EmergencyScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (showShareLocationDialog) {
+        val sosMessage = "🚨 EMERGENCY SOS! I need help immediately. My current live location is: $mapLink\n(Sent via SafeSphere Emergency)"
+        com.example.ui.components.SafetyShareDialog(
+            title = "Share Live Location",
+            subtitle = "Send emergency GPS location to your parents & contacts",
+            message = sosMessage,
+            recipientName = parentName,
+            recipientPhone = parentPhone,
+            isEmergency = true,
+            onDismiss = { showShareLocationDialog = false }
+        )
+    }
+
+    if (showNotifyParentsDialog) {
+        val imOkMessage = "Hi $parentName, I wanted to let you know that I am safe and doing OK! 👍\nMy current location: $mapLink\n(Sent via SafeSphere Check-In)"
+        com.example.ui.components.SafetyShareDialog(
+            title = "Notify Parents - I'm OK",
+            subtitle = "Forward \"I'm OK\" status to parents via WhatsApp or SMS",
+            message = imOkMessage,
+            recipientName = parentName,
+            recipientPhone = parentPhone,
+            isImOk = true,
+            onDismiss = { showNotifyParentsDialog = false }
         )
     }
 }

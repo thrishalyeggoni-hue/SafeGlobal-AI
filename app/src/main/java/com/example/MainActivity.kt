@@ -120,7 +120,7 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
             ScreenDestination.LOADING -> viewModel.navigateTo(ScreenDestination.LOGIN)
             ScreenDestination.CONSENT -> viewModel.navigateTo(ScreenDestination.LOGIN)
             ScreenDestination.CHOOSE_ROLE -> viewModel.navigateTo(ScreenDestination.LOGIN)
-            ScreenDestination.CREATE_ID -> viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE)
+            ScreenDestination.CREATE_ID -> viewModel.navigateTo(ScreenDestination.LOGIN)
             ScreenDestination.CREATE_PASSWORD -> viewModel.navigateTo(ScreenDestination.CREATE_ID)
             ScreenDestination.COMPLETE_PROFILE -> viewModel.navigateTo(ScreenDestination.CREATE_PASSWORD)
             ScreenDestination.LINK_CODE_GENERATOR -> viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
@@ -443,34 +443,29 @@ fun SafeSphereApp(viewModel: SafeSphereViewModel) {
                     )
                     ScreenDestination.LOGIN -> LoginScreen(
                         viewModel = viewModel,
-                        onAuthenticated = { viewModel.onAuthSuccess() }
+                        onAuthenticated = {
+                            val role = viewModel.activeDashboardRole.value
+                            viewModel.navigateTo(
+                                if (role == UserRole.PARENT) ScreenDestination.PARENT_DASHBOARD
+                                else ScreenDestination.STUDENT_DASHBOARD
+                            )
+                        }
                     )
-                    ScreenDestination.CHOOSE_ROLE -> RoleSelectionScreen(
-                        viewModel = viewModel,
-                        onContinue = { viewModel.navigateTo(ScreenDestination.CREATE_ID) },
-                        onBack = { viewModel.navigateTo(ScreenDestination.LOGIN) }
-                    )
-                    ScreenDestination.CREATE_ID -> CreateIdScreen(
-                        viewModel = viewModel,
-                        onContinue = { viewModel.navigateTo(ScreenDestination.CREATE_PASSWORD) },
-                        onBack = { viewModel.navigateTo(ScreenDestination.CHOOSE_ROLE) }
-                    )
-                    ScreenDestination.CREATE_PASSWORD -> CreatePasswordScreen(
-                        viewModel = viewModel,
-                        onContinue = { viewModel.navigateTo(ScreenDestination.COMPLETE_PROFILE) },
-                        onBack = { viewModel.navigateTo(ScreenDestination.CREATE_ID) }
-                    )
-                    ScreenDestination.COMPLETE_PROFILE -> CompleteProfileScreen(
-                        viewModel = viewModel,
-                        onCreateAccount = {
-                            if (viewModel.selectedRole.value == UserRole.PARENT) {
+                    ScreenDestination.CHOOSE_ROLE,
+                    ScreenDestination.CREATE_ID,
+                    ScreenDestination.CREATE_PASSWORD,
+                    ScreenDestination.COMPLETE_PROFILE -> {
+                        LaunchedEffect(Unit) {
+                            val role = viewModel.activeDashboardRole.value
+                            if (viewModel.authSessionState.value == AuthSessionState.AUTHENTICATED_PARENT || role == UserRole.PARENT) {
                                 viewModel.navigateTo(ScreenDestination.PARENT_DASHBOARD)
-                            } else {
+                            } else if (viewModel.authSessionState.value == AuthSessionState.AUTHENTICATED_STUDENT || role == UserRole.STUDENT) {
                                 viewModel.navigateTo(ScreenDestination.STUDENT_DASHBOARD)
+                            } else {
+                                viewModel.navigateTo(ScreenDestination.LOGIN)
                             }
-                        },
-                        onBack = { viewModel.navigateTo(ScreenDestination.CREATE_PASSWORD) }
-                    )
+                        }
+                    }
                     ScreenDestination.PARENT_DASHBOARD -> ParentDashboardScreen(
                         viewModel = viewModel
                     )
